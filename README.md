@@ -6,20 +6,32 @@
 
 ## システム構成
 
-```
-[子供 (4席)]                       [中央ノートPC]
- Raspberry Pi #1〜#4                 ┌─ ドローンモニタ（全機マップ）
-   │ Scratch ─── tellomon.py        └─ YOLO結果表示（ねこ/いぬセル + bbox 画像）
-   │                ▲                        ▲
-   │ HTTP           │ ビーコン (UDP 11231)   │ 検知結果 (UDP 11212〜11215)
-   │                │                        │
-   ▼                │              [YOLO PC]
- Tello EDU ────映像 (UDP 11112〜11115)───→ yolo_proc (YOLOv8)
+```mermaid
+flowchart LR
+    T["Tello EDU<br/>4台"] <-.->|"Wi-Fi 2.4GHz"| P["Raspberry Pi 4台<br/>Scratch + tellomon.py"]
+    P ==>|"ビデオ<br/>:11112〜11115"| Y["YOLO<br/>4インスタンス"]
+    Y -->|"検知結果<br/>:11212〜11215"| D["YOLO結果表示<br/>(中央画面)"]
+    P -.->|"ビーコン :11231"| M["ドローンモニタ<br/>(中央画面)"]
+
+    subgraph LAN["ノートPC 192.168.0.100"]
+        Y
+        D
+        M
+    end
+
+    classDef tello fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef pi fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    classDef pc fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    class T tello
+    class P pi
+    class Y,D,M pc
 ```
 
 - **同時稼働 4 台**（Tello EDU / Raspberry Pi 各4台、YOLO PC 1台、中央ノートPC 1台）
 - 操作 UI は Scratch のみ（子供が触る唯一の UI）
 - 中央モニタは「全機俯瞰」用、個別 UI は作らない
+
+詳細は [docs/figures/system-arch.mmd](docs/figures/system-arch.mmd) と運用配置図 [docs/figures/operation-layout.mmd](docs/figures/operation-layout.mmd) 参照。
 
 ## ディレクトリ構成
 
