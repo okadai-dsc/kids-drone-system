@@ -1,0 +1,22 @@
+# 6月中は別管理（保留事項）
+Scratch/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Node
+node_modules/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Tello 関連の出力・スナップショット
+tello/.tellomon.py.sw*
+tello/tellomon.py.[0-9]*
