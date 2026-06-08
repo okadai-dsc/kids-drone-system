@@ -86,13 +86,18 @@ cd kids-drone-system
 # 2. Python 環境（Python 3.12 + uv workspace）
 uv sync
 
-# 3. lint / format（保存時自動整形を推奨）
+# 3. pre-commit のインストール（初回のみ）
+uv run pre-commit install
+
+# 4. lint / format（保存時自動整形を推奨）
 uv run ruff check .
 uv run ruff format .
 ```
 
 - パッケージ管理は **uv** に統一。`pip` や `requirements.txt` は使わない
 - スタイルは **Ruff**（設定は [pyproject.toml](pyproject.toml)）。エディタの保存時自動整形を有効にすると楽
+- **pre-commit**：`git commit` するたびに自動で Ruff（lint + format）が走り、整形が必要なら止まる。慌てずに再 add → 再 commit
+- **CI**：PR を出すと GitHub Actions で同じ Ruff チェックが走る（[.github/workflows/lint.yml](.github/workflows/lint.yml)）。赤になっても焦らずローカルで `uv run ruff format .` してから push
 
 ## 開発ルール
 

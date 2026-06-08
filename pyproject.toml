@@ -12,6 +12,12 @@ members = [
     "tello",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+    "pre-commit>=4.0",
+]
+
 # ---------------------------------------------------------------------------
 # Ruff: lint + format（保存時自動整形を推奨）
 # ---------------------------------------------------------------------------
@@ -20,6 +26,7 @@ line-length = 100
 target-version = "py312"
 extend-exclude = [
     "Scratch",        # LLK 公式 clone なので対象外
+    "tello",          # 旧コード。C2 (#2) で pi/tellomon/ に移植する時に format + 修正する
     "**/.venv",
     "**/node_modules",
 ]
