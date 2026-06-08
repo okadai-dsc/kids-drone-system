@@ -76,6 +76,34 @@ GitHub の **Milestone (M1〜M4)** と **Issue (C1〜C7)** で管理。
 
 ラベル：`area:tellomon` / `area:yolo_proc` / `area:drone_monitor` / `area:yolo_display` / `area:scratch` / `area:shared`、`role:A` / `role:B`
 
+## ローカル開発
+
+```bash
+# 1. clone
+git clone https://github.com/okadai-dsc/kids-drone-system.git
+cd kids-drone-system
+
+# 2. Python 環境（Python 3.12 + uv workspace）
+uv sync
+
+# 3. lint / format（保存時自動整形を推奨）
+uv run ruff check .
+uv run ruff format .
+```
+
+- パッケージ管理は **uv** に統一。`pip` や `requirements.txt` は使わない
+- スタイルは **Ruff**（設定は [pyproject.toml](pyproject.toml)）。エディタの保存時自動整形を有効にすると楽
+
+## 開発ルール
+
+- **`main` への直接 push は禁止**。必ず PR 経由でマージする
+- PR は A の approve を待ってからマージ
+- ブランチ名：`<issue番号>-<短い説明>`（例：`8-yolo-setup`）
+- Commit メッセージは簡潔に。日本語 OK
+- 困ったら親 Issue（C1〜C7）にコメント、30 分で詰まったら相談
+
+> 自動強制ができない（GitHub Free + Private リポの制約）ため、ルールでカバーします。リポを Public 化したら branch protection を有効にする予定。
+
 ## ライセンス
 
 [MIT](LICENSE)

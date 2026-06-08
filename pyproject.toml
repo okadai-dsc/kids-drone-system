@@ -1,0 +1,42 @@
+[project]
+name = "kids-drone-system"
+version = "0.1.0"
+description = "おもしろ体験でぇ～ 出展システム"
+readme = "README.md"
+requires-python = ">=3.12"
+
+# 各サブパッケージ（pi/tellomon, yolo_pc/yolo_proc, operator_pc/*, shared）は
+# 着手時に member として追加していく。tello/ は移植前なので一時的にここに入れている。
+[tool.uv.workspace]
+members = [
+    "tello",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff: lint + format（保存時自動整形を推奨）
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "Scratch",        # LLK 公式 clone なので対象外
+    "**/.venv",
+    "**/node_modules",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes（未使用 import / 未定義変数）
+    "I",      # isort（import の並び）
+    "W",      # warnings
+    "UP",     # pyupgrade（古い書き方の検出）
+    "B",      # flake8-bugbear（疑わしいコード）
+]
+ignore = [
+    "E501",   # line too long → ruff format に任せる
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
