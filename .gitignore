@@ -20,3 +20,7 @@ node_modules/
 # Tello 関連の出力・スナップショット
 tello/.tellomon.py.sw*
 tello/tellomon.py.[0-9]*
+
+# docs の派生物（.md から生成される中間 html）
+# 発注者向け成果物（_配布用.html / .pdf / .zip）は既追跡なので残る
+docs/**/*.html
