@@ -27,41 +27,31 @@ flowchart LR
     class Y,D,M pc
 ```
 
-- **同時稼働 4 台**（Tello EDU / Raspberry Pi 各4台、YOLO PC 1台、中央ノートPC 1台）
+- **同時稼働 4 台**（Tello EDU / Raspberry Pi 各4台）＋ 中央ノートPC 1台（192.168.0.100、YOLO 推論・YOLO 結果表示・ドローンモニタを兼ねる）
 - 操作 UI は Scratch のみ（子供が触る唯一の UI）
 - 中央モニタは「全機俯瞰」用、個別 UI は作らない
-
-詳細は [docs/figures/system-arch.mmd](docs/figures/system-arch.mmd) と運用配置図 [docs/figures/operation-layout.mmd](docs/figures/operation-layout.mmd) 参照。
 
 ## ディレクトリ構成
 
 | ディレクトリ | 役割 |
 |---|---|
 | `pi/tellomon/` | Pi 側の Tello 制御プログラム（映像転送・ビーコン送信・HTTP API）|
-| `yolo_pc/yolo_proc/` | YOLO PC 側の推論プロセス（YOLOv8）|
+| `yolo_pc/yolo_proc/` | 中央ノートPC 上の YOLO 推論プロセス（YOLOv8）|
 | `operator_pc/drone_monitor/` | 中央ノートPC のドローンモニタ |
 | `operator_pc/yolo_display/` | 中央ノートPC の YOLO 結果表示 |
 | `shared/` | ポート番号・JSON フォーマット等の共通定義 |
 | `Scratch/` | 子供向け UI（LLK 公式 clone + drone 拡張 / **git 管理外**）|
-| `docs/` | 設計書・計画書 |
+| `docs/` | 開発フロー（`development.md`）のみ。設計書・計画書・PDF・図はリポジトリ管理外（手元 / Drive 等で管理）|
 
 > `Scratch/` は LLK 公式リポジトリの clone のため `.gitignore` で除外しています。改修要否は 6/30 時点で判断し、必要なら部 org に fork して submodule 化します。
 
 ## ドキュメント
 
-| ファイル | 内容 |
-|---|---|
-| [docs/出展システム説明書.pdf](docs/出展システム説明書.pdf) | 武田氏発の設計書（正本）|
-| [docs/おもしろ体験でぇー.pdf](docs/おもしろ体験でぇー.pdf) | イベント説明資料 |
-| [docs/スケジュール等に関して.pdf](docs/スケジュール等に関して.pdf) | スケジュール資料 |
-| [docs/発注者確認依頼書.pdf](docs/発注者確認依頼書.pdf) | 開発側→武田氏への確認事項（全項目合意済み）|
-| [docs/開発者補足/仕様詳細ドラフト.md](docs/開発者補足/仕様詳細ドラフト.md) | JSON フィールド・配色・体験フローの実装ガイド |
-| [docs/開発者補足/ポート一覧.md](docs/開発者補足/ポート一覧.md) | 全 UDP/HTTP ポート定義と IP 割当 |
-| [docs/開発者補足/開発計画.md](docs/開発者補足/開発計画.md) | 6月末までの WBS・担当分担・マイルストーン |
+設計書（正本）・計画書・ポート定義・仕様詳細ドラフト・PDF・図は **リポジトリ管理外**（手元 / Drive 等で管理）。リポジトリに含むのは開発フロー [docs/development.md](docs/development.md) のみ。
 
 ## 体制
 
-経験者 1名 + 初心者 1名の2名チーム。担当分けは [開発計画.md §3](docs/開発者補足/開発計画.md) 参照。
+経験者 1名 + 初心者 1名の2名チーム。担当分けは開発計画（リポジトリ管理外）参照。
 
 ## 進め方
 

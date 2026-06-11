@@ -21,6 +21,8 @@ node_modules/
 tello/.tellomon.py.sw*
 tello/tellomon.py.[0-9]*
 
-# docs の派生物（.md から生成される中間 html）
-# 発注者向け成果物（_配布用.html / .pdf / .zip）は既追跡なので残る
-docs/**/*.html
+# docs は development.md 以外すべて git 管理外（履歴からも削除済み）
+# 設計書・計画書・PDF・図は手元 or 外部（Drive 等）で管理する
+docs/*
+!docs/development.md
+!docs/.gitkeep
