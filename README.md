@@ -43,7 +43,7 @@ flowchart LR
 | `Scratch/` | 子供向け UI（LLK 公式 clone + drone 拡張 / **git 管理外**）|
 | `docs/` | 開発フロー（`development.md`）のみ。設計書・計画書・PDF・図はリポジトリ管理外（手元 / Drive 等で管理）|
 
-> `Scratch/` は LLK 公式リポジトリの clone のため `.gitignore` で除外しています。改修要否は 6/30 時点で判断し、必要なら部 org に fork して submodule 化します。
+> `Scratch/` は LLK 公式リポジトリの clone のため `.gitignore` で除外しています。drone 拡張の改造は消失リスク回避のため **`okadai-dsc` に fork 済み**（`okadai-dsc/scratch-vm`・`okadai-dsc/scratch-gui` の `drone` ブランチ）。セットアップ手順は [docs/development.md](docs/development.md) を参照。submodule 化は必要が出たら別 issue で対応します。
 
 ## ドキュメント
 
