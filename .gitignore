@@ -26,3 +26,6 @@ tello/tellomon.py.[0-9]*
 docs/*
 !docs/development.md
 !docs/.gitkeep
+
+# Claude Code 個人設定（共有しない）
+.claude/settings.local.json
