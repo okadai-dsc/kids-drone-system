@@ -1,0 +1,8 @@
+[project]
+name = "yolo_proc"
+version = "0.1.0"
+description = "YOLO PC inference process"
+requires-python = ">=3.12"
+dependencies = [
+    "ultralytics>=8.0.0",
+]
