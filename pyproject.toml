@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "おもしろ体験でぇ～ 出展システム"
 readme = "README.md"
 requires-python = ">=3.12"
+dependencies = [
+    # pi/tellomon が映像処理に使用（`uv run python -m pi.tellomon` をルート env で起動するため）
+    "opencv-python>=4.13.0.92",
+]
 
 # 各サブパッケージ（pi/tellomon, yolo_pc/yolo_proc, operator_pc/*, shared）は
 # 着手時に member として追加していく。tello/ は移植前なので一時的にここに入れている。
