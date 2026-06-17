@@ -1,8 +1,12 @@
 from ultralytics import YOLO
 
-# Load a pretrained YOLO26n model
-model = YOLO("yolo26n.pt")
 
-# Perform object detection on an image
-results = model("path/to/image.jpg")  # Predict on an image
-results[0].show()  # Display results
+def main():
+    model = YOLO("yolov8n.pt")
+    results = model("path/to/image.jpg")
+    for r in results:
+        print(r.boxes.data)
+
+
+if __name__ == "__main__":
+    main()
