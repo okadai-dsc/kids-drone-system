@@ -26,3 +26,6 @@ tello/tellomon.py.[0-9]*
 docs/*
 !docs/development.md
 !docs/.gitkeep
+
+# YOLO の学習済みモデル（自動DLされる。リポジトリには含めない）
+*.pt

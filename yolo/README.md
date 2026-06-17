@@ -44,3 +44,31 @@ Parsed JSON dict: {'tello_id': 'Tello#1', 'ts': '2026-06-15T21:23:45.678', 'dete
 - `--drone [1-4]`: 対象のドローン番号を指定します。指定した番号に応じてポートが自動で切り替わります（1: `11212` / 2: `11213` / 3: `11214` / 4: `11215`）。
 - `--port [port]`: 任意のポート番号を直接指定して通信を行いたい場合に使用します（指定時は `--drone` の自動設定より優先されます）。
 - `--host [host]`: （送信側のみ）送信先のホストを指定します（既定: `127.0.0.1`）。実機検証時などに別 PC から送信する場合に指定します。
+
+---
+
+# yolo_proc.py — 受信→推論→送信 を1プロセスで (#10)
+
+Pi から転送された Tello 映像（UDP 生 H.264）を受信し、各フレームを YOLO で推論、
+**犬猫（cat/dog）の検知結果**を `shared.schemas.YoloResult` の JSON にして
+結果表示（yolo_display）へ UDP 送信する。
+
+```bash
+# 本番（映像を受信して 1Hz で結果送信）
+uv run python yolo/yolo_proc.py --drone 1
+#   udp://@0.0.0.0:11112 で映像受信 → 127.0.0.1:11212 へ結果送信
+
+# 映像ストリーム無しでの単発テスト/デモ（画像1枚を推論して1回送信）
+uv run python yolo/yolo_proc.py --drone 1 --image path/to/dog.jpg
+```
+
+`udp_receiver.py` を相手に起動すれば送受信を確認できる。主なオプション：
+`--video-port` / `--display-host` / `--display-port` / `--model`（既定 `yolov8n.pt`）/
+`--conf`（信頼度しきい値）/ `--max-width` `--jpeg-quality`（送信画像サイズ調整、目標 < 50KB）/ `--rate`（送信 Hz）。
+
+## 注意（WSL2 開発環境）
+
+WSL2（mirrored networking）では **1472 byte を超える UDP datagram が落ちる**ため、
+画像入り（base64 JPEG ≈ 数十 KB）の YoloResult は WSL2 上の loopback では届かない。
+検知ロジック・JSON 送受信自体は正常（小さいパケットや実機/ネイティブ環境では問題なし）。
+本番の中央ノートPC（ネイティブ）の loopback は MTU 65536 のため画像入りでも送れる。
