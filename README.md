@@ -53,6 +53,19 @@ flowchart LR
 
 経験者 1名 + 初心者 1名の2名チーム。担当分けは開発計画（リポジトリ管理外）参照。
 
+## 起動例
+
+YOLO 結果表示:
+
+```bash
+uv sync
+uv run python yolo_display.py
+```
+
+`fake_detection.json` の読み込み、または UDP `11212〜11215` の `YoloResult` 受信で
+Tello#1〜#4 の bbox 画像が 4 区画に表示されます。
+検知時は各画像区画の小さな状態ラベルと枠が 3 秒間緑に変わります。
+
 ## 進め方
 
 GitHub の **Milestone (M1〜M4)** と **Issue (C1〜C7)** で管理。
