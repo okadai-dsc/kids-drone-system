@@ -179,7 +179,8 @@ class YoloDisplayApp:
         if result.tello_id in self.image_panels:
             self._set_drone_detected(result.tello_id, detected_labels)
 
-        if detected_labels and result.image_b64:
+        # 検知の有無に関わらず、フレーム画像が来ていれば常時表示する（ライブ映像として）
+        if result.image_b64:
             self._show_image(result.tello_id, result.image_b64)
 
         labels = " / ".join(LABEL_TEXT[label] for label in sorted(detected_labels)) or "未検知"
