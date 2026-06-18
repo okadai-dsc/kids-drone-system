@@ -373,6 +373,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         global VS_FLAG
         global VS_IMG
+        global VIDEO_FLAG
         global thread1
         global thread2
 
@@ -453,6 +454,9 @@ class HttpHandler(BaseHTTPRequestHandler):
             if opcode == "streamon":
                 VS_FLAG = 0
                 VS_IMG = 0
+                # 映像開始と同時に YOLO PC への転送も有効化する
+                # （run_udp_receiver が VIDEO_FLAG==1 のとき serv2 へ転送する）
+                VIDEO_FLAG = 1
                 if thread1 is None:
                     thread1 = threading.Thread(target=run_udp_monitor, args=())
                     thread1.daemon = True
@@ -460,6 +464,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
             if opcode == "streamoff":
                 VS_FLAG = 1
+                # 映像停止に合わせて YOLO PC 転送も止める
+                VIDEO_FLAG = 0
 
             # Telloコマンドが正常終了した場合、Telloの状態を変更する様に
             # メインスレッドにキューを使用して依頼

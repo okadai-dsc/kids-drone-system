@@ -25,6 +25,7 @@ tello/tellomon.py.[0-9]*
 # 設計書・計画書・PDF・図は手元 or 外部（Drive 等）で管理する
 docs/*
 !docs/development.md
+!docs/demo.md
 !docs/.gitkeep
 *.pt
 .claude/settings.local.json
