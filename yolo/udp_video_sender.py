@@ -30,7 +30,9 @@ def _parse_args():
     parser.add_argument("--width", type=int, default=640, help="送信フレーム幅")
     parser.add_argument("--height", type=int, default=360, help="送信フレーム高さ")
     parser.add_argument("--fps", type=float, default=15.0, help="送信FPS")
-    parser.add_argument("--seconds", type=float, default=0.0, help="送信秒数（0ならCtrl-Cまで継続）")
+    parser.add_argument(
+        "--seconds", type=float, default=0.0, help="送信秒数（0ならCtrl-Cまで継続）"
+    )
     return parser.parse_args()
 
 
@@ -125,7 +127,9 @@ def main():
         while True:
             if args.seconds > 0 and time.monotonic() - started >= args.seconds:
                 break
-            frame = image_frame.copy() if image_frame is not None else _make_pattern(*size, frame_index)
+            frame = (
+                image_frame.copy() if image_frame is not None else _make_pattern(*size, frame_index)
+            )
             writer.stdin.write(frame.tobytes())
             frame_index += 1
             time.sleep(interval)

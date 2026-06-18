@@ -178,7 +178,9 @@ def _parse_args():
     parser.add_argument("--jpeg-quality", type=int, default=60, help="JPEG 品質(1-100)")
     parser.add_argument("--rate", type=float, default=1.0, help="結果送信レート Hz（既定 1Hz）")
     parser.add_argument("--metrics-interval", type=float, default=10.0, help="メトリクス出力間隔秒")
-    parser.add_argument("--duration", type=float, default=0.0, help="指定秒数で終了（0ならCtrl-Cまで継続）")
+    parser.add_argument(
+        "--duration", type=float, default=0.0, help="指定秒数で終了（0ならCtrl-Cまで継続）"
+    )
     parser.add_argument("--image", help="（テスト用）映像の代わりに画像1枚を推論して1回送信")
     return parser.parse_args()
 
