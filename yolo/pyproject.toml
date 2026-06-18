@@ -4,5 +4,6 @@ version = "0.1.0"
 description = "YOLO PC inference process"
 requires-python = ">=3.12"
 dependencies = [
+    "imageio-ffmpeg>=0.6.0",
     "ultralytics>=8.0.0",
 ]

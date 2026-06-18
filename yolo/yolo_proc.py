@@ -32,6 +32,7 @@ from shared.schemas import DETECT_LABELS, Detection, YoloResult, drone_id, now_i
 
 # 検知枠の色（cat/dog で色分け。BGR）
 _BOX_COLORS = {"cat": (0, 200, 0), "dog": (0, 160, 255)}
+_UDP_PACKET_TARGET_BYTES = 50_000
 
 
 def detect(model, frame, conf):
@@ -86,6 +87,18 @@ def build_result(drone_num, detections, annotated, max_width, quality):
     )
 
 
+def send_result(sock, dest, result):
+    packet = result.to_json().encode("utf-8")
+    sock.sendto(packet, dest)
+    suffix = ""
+    if len(packet) > _UDP_PACKET_TARGET_BYTES:
+        suffix = f" WARNING: over {_UDP_PACKET_TARGET_BYTES} byte target"
+    print(
+        f"sent result -> {dest}: {len(packet)} bytes, "
+        f"image_b64={len(result.image_b64)} chars{suffix}"
+    )
+
+
 def _parse_args():
     parser = argparse.ArgumentParser(description="yolo_proc: 映像受信→YOLO推論→結果送信 (#10)")
     parser.add_argument("--drone", type=int, choices=[1, 2, 3, 4], default=1, help="ドローン番号")
@@ -120,9 +133,9 @@ def main():
             return
         detections, annotated = detect(model, frame, args.conf)
         result = build_result(args.drone, detections, annotated, args.max_width, args.jpeg_quality)
-        sock.sendto(result.to_json().encode("utf-8"), dest)
+        send_result(sock, dest, result)
         labels = [d.label for d in detections]
-        print(f"sent 1 result -> {dest}: detections={labels}")
+        print(f"detections={labels}")
         sock.close()
         return
 
@@ -148,7 +161,7 @@ def main():
             result = build_result(
                 args.drone, detections, annotated, args.max_width, args.jpeg_quality
             )
-            sock.sendto(result.to_json().encode("utf-8"), dest)
+            send_result(sock, dest, result)
             print(
                 f"{result.ts}  {drone_id(args.drone)}  detections={[d.label for d in detections]}"
             )
