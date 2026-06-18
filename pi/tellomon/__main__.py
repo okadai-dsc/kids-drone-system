@@ -148,7 +148,8 @@ CAMERA = "0"
 def run_udp_receiver(drone_num):
 
     M_SIZE = 65535
-    host = "192.168.10.2"
+    # 0.0.0.0 で待受（Tello網のDHCPで割り当てIPが 192.168.10.2 以外でも受信できるように）
+    host = "0.0.0.0"
     port = 11111
     locaddr = (host, port)
     recv_sock = socket.socket(socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -168,7 +169,15 @@ def run_udp_receiver(drone_num):
 
     # 外部の転送先（YOLO PC）のアドレスとポート。shared.ports から機体番号で引く
     serv2_address = (NOTE_PC_IP, PI_TO_YOLO_VIDEO_PORTS[drone_num])
+    # YOLO PC への転送ソケットは 1 本を使い回す（毎パケット作ると FD が枯渇し途中で止まる）
+    send_sock2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    print(
+        f"[video] receiver ready: recv {locaddr} -> monitor {serv1_address} / YOLO {serv2_address}"
+    )
 
+    rx_count = 0  # 直近 1 秒の Tello からの受信パケット数
+    fwd_count = 0  # 直近 1 秒の YOLO PC への転送パケット数
+    last_log = time.time()
     while True:
         try:
             message, cli_addr = recv_sock.recvfrom(M_SIZE)
@@ -177,16 +186,28 @@ def run_udp_receiver(drone_num):
             time.sleep(2)
             continue
 
+        rx_count += 1
         try:
             # モニタにビデオを転送する
             send_sock1.sendto(message, serv1_address)
-            # 外部にビデオを転送する
+            # 外部（YOLO PC）にビデオを転送する
             if VIDEO_FLAG == 1:
-                send_sock2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 send_sock2.sendto(message, serv2_address)
+                fwd_count += 1
 
         except OSError:
             continue
+
+        # 1 秒ごとに「Tello から受信／YOLO PC へ転送」した pkt/s を出す
+        now = time.time()
+        if now - last_log >= 1.0:
+            print(
+                f"[video] rx={rx_count}pkt/s  forwarded_to_yolo={fwd_count}pkt/s  "
+                f"VIDEO_FLAG={VIDEO_FLAG}  -> {serv2_address[0]}:{serv2_address[1]}"
+            )
+            rx_count = 0
+            fwd_count = 0
+            last_log = now
 
 
 # ビデオ画像のモニタ用関数
