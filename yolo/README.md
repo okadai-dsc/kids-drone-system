@@ -85,8 +85,10 @@ uv run python yolo/yolo_proc.py --drone 1 --image path/to/dog.jpg
 ```
 
 `udp_receiver.py` を相手に起動すれば送受信を確認できる。主なオプション：
-`--video-port` / `--display-host` / `--display-port` / `--model`（既定 `yolov8n.pt`）/
-`--conf`（信頼度しきい値）/ `--max-width` `--jpeg-quality`（送信画像サイズ調整、目標 < 50KB）/ `--rate`（送信 Hz）。
+`--video-port` または `--rx` / `--display-host` / `--display-port` または `--tx` /
+`--model`（既定 `yolov8n.pt`）/ `--conf`（信頼度しきい値）/
+`--max-width` `--jpeg-quality`（送信画像サイズ調整、目標 < 50KB）/
+`--rate`（送信 Hz）/ `--metrics-interval`（fps・メモリログ間隔）/ `--duration`（指定秒数で終了）。
 
 ### 次の確認: 実画像を YOLO 推論して送る
 
@@ -126,6 +128,72 @@ uv run python yolo/udp_video_sender.py --drone 1
 
 ```bash
 uv run python yolo/udp_video_sender.py --drone 1 --image path/to/cat_or_dog.jpg
+```
+
+## yolo_proc.py — 連続稼働 + 2インスタンス並列起動 (#11)
+
+### ログの見方
+
+`yolo_proc.py` は `--metrics-interval` 秒ごとに以下の形式でメトリクスを出します。
+
+```text
+metrics drone=Tello#1 rx=11112 tx=11212 elapsed_sec=60.3 read_fps=15.00 infer_fps=5.00 sent=301 reopens=0 rss_mb=742.5
+```
+
+- `read_fps`: UDP 映像から読めているフレーム数/秒
+- `infer_fps`: YOLO 推論して結果送信した回数/秒。5fps 検証ではここが `5.00` 前後なら OK
+- `sent`: 結果 JSON 送信数
+- `reopens`: 映像が読めず `VideoCapture` を開き直した回数。増え続ける場合は映像入力が不安定
+- `rss_mb`: プロセスのメモリ使用量。長時間で増え続けないかを見る
+
+### 30分連続稼働
+
+実機映像がある場合は `yolo_proc.py` だけで確認できます。5fps を見る場合は `--rate 5` を指定します。
+
+```bash
+uv run python yolo/yolo_proc.py --drone 1 --rate 5 --duration 1800 --metrics-interval 30
+```
+
+ダミー映像で確認する場合は、別ターミナルで `udp_video_sender.py` を流します。
+
+```bash
+# ターミナル 1: ダミー映像
+uv run python yolo/udp_video_sender.py --drone 1 --image cat.jpg --fps 15 --seconds 1800
+
+# ターミナル 2: 30分連続稼働
+uv run python yolo/yolo_proc.py --drone 1 --rate 5 --duration 1800 --metrics-interval 30
+```
+
+### 2インスタンス並列起動
+
+Tello#1 と Tello#2 のポートを使う場合は、以下の4プロセスを起動します。
+
+```bash
+# ターミナル 1: Tello#1 の結果受信
+uv run python yolo/udp_receiver.py --drone 1
+
+# ターミナル 2: Tello#2 の結果受信
+uv run python yolo/udp_receiver.py --drone 2
+
+# ターミナル 3: Tello#1 用 yolo_proc
+uv run python yolo/yolo_proc.py --drone 1 --rate 5 --metrics-interval 30
+
+# ターミナル 4: Tello#2 用 yolo_proc
+uv run python yolo/yolo_proc.py --drone 2 --rate 5 --metrics-interval 30
+```
+
+ダミー映像も2本流す場合は、さらに以下を起動します。
+
+```bash
+uv run python yolo/udp_video_sender.py --drone 1 --image cat.jpg --fps 15
+uv run python yolo/udp_video_sender.py --drone 2 --image cat.jpg --fps 15
+```
+
+ポート番号を直接指定したい場合は `--rx` / `--tx` を使えます。
+
+```bash
+uv run python yolo/yolo_proc.py --rx 11112 --tx 11212 --rate 5
+uv run python yolo/yolo_proc.py --rx 11113 --tx 11213 --rate 5
 ```
 
 ## 注意（WSL2 開発環境）
