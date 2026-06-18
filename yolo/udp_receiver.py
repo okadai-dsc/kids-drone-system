@@ -62,7 +62,7 @@ def run_receiver():
             if args.max_messages and received >= args.max_messages:
                 print("\nReceiver reached max messages.")
                 break
-    except socket.timeout:
+    except TimeoutError:
         print("\nReceiver timed out.")
     except KeyboardInterrupt:
         print("\nReceiver stopped.")
