@@ -20,6 +20,13 @@ def run_receiver():
         help="対象のドローン番号 (1〜4)。指定すると自動的に対応するポートが選択されます",
     )
     parser.add_argument("--port", type=int, help="待受ポート（指定時は --drone より優先されます）")
+    parser.add_argument(
+        "--max-messages",
+        type=int,
+        default=0,
+        help="指定数を受信したら終了（0ならCtrl-Cまで継続）",
+    )
+    parser.add_argument("--timeout", type=float, help="受信タイムアウト秒数")
     args = parser.parse_args()
 
     host = args.host
@@ -27,23 +34,36 @@ def run_receiver():
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((host, port))
+    if args.timeout is not None:
+        sock.settimeout(args.timeout)
     print(
         f"Listening on udp://{host}:{port} (Tello#{args.drone if args.port is None else 'custom'}). Ctrl-C to stop."
     )
 
+    received = 0
     try:
         while True:
             data, addr = sock.recvfrom(65536)
+            received += 1
             print(f"\nReceived {len(data)} bytes from {addr}")
 
             try:
                 # JSONとしてパースを試みる
                 text = data.decode("utf-8")
                 parsed = json.loads(text)
-                print(f"Parsed JSON dict: {parsed}")
+                image_b64 = parsed.get("image_b64", "")
+                summary = {k: v for k, v in parsed.items() if k != "image_b64"}
+                print(f"Parsed JSON summary: {summary}")
+                print(f"image_b64 length: {len(image_b64)} chars")
             except (UnicodeDecodeError, json.JSONDecodeError):
                 # JSONでなければそのまま bytes として表示
                 print(f"Raw bytes: {data}")
+
+            if args.max_messages and received >= args.max_messages:
+                print("\nReceiver reached max messages.")
+                break
+    except TimeoutError:
+        print("\nReceiver timed out.")
     except KeyboardInterrupt:
         print("\nReceiver stopped.")
     finally:

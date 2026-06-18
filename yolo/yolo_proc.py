@@ -21,6 +21,7 @@ import os
 import socket
 import sys
 import time
+from collections import deque
 
 import cv2
 from ultralytics import YOLO
@@ -32,6 +33,12 @@ from shared.schemas import DETECT_LABELS, Detection, YoloResult, drone_id, now_i
 
 # 検知枠の色（cat/dog で色分け。BGR）
 _BOX_COLORS = {"cat": (0, 200, 0), "dog": (0, 160, 255)}
+_UDP_PACKET_TARGET_BYTES = 50_000
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 
 def detect(model, frame, conf):
@@ -86,24 +93,105 @@ def build_result(drone_num, detections, annotated, max_width, quality):
     )
 
 
+def send_result(sock, dest, result):
+    packet = result.to_json().encode("utf-8")
+    sock.sendto(packet, dest)
+    suffix = ""
+    if len(packet) > _UDP_PACKET_TARGET_BYTES:
+        suffix = f" WARNING: over {_UDP_PACKET_TARGET_BYTES} byte target"
+    print(
+        f"sent result -> {dest}: {len(packet)} bytes, "
+        f"image_b64={len(result.image_b64)} chars{suffix}"
+    )
+
+
+class Metrics:
+    def __init__(self, interval_sec):
+        self.interval_sec = interval_sec
+        self.started = time.monotonic()
+        self.last_report = self.started
+        self.read_times = deque()
+        self.infer_times = deque()
+        self.sent_count = 0
+        self.reopen_count = 0
+        self.process = psutil.Process(os.getpid()) if psutil is not None else None
+
+    def mark_read(self, now):
+        self._append_recent(self.read_times, now)
+
+    def mark_infer(self, now):
+        self._append_recent(self.infer_times, now)
+
+    def mark_sent(self):
+        self.sent_count += 1
+
+    def mark_reopen(self):
+        self.reopen_count += 1
+
+    def maybe_report(self, now, drone_num, video_port, display_port):
+        if self.interval_sec <= 0 or now - self.last_report < self.interval_sec:
+            return
+        elapsed = now - self.started
+        read_fps = len(self.read_times) / min(elapsed, self.interval_sec)
+        infer_fps = len(self.infer_times) / min(elapsed, self.interval_sec)
+        memory = "rss_mb=unknown"
+        if self.process is not None:
+            memory = f"rss_mb={self.process.memory_info().rss / 1024 / 1024:.1f}"
+        print(
+            "metrics "
+            f"drone={drone_id(drone_num)} rx={video_port} tx={display_port} "
+            f"elapsed_sec={elapsed:.1f} read_fps={read_fps:.2f} "
+            f"infer_fps={infer_fps:.2f} sent={self.sent_count} "
+            f"reopens={self.reopen_count} {memory}"
+        )
+        self.last_report = now
+
+    def _append_recent(self, values, now):
+        values.append(now)
+        cutoff = now - self.interval_sec
+        while values and values[0] < cutoff:
+            values.popleft()
+
+
 def _parse_args():
     parser = argparse.ArgumentParser(description="yolo_proc: 映像受信→YOLO推論→結果送信 (#10)")
     parser.add_argument("--drone", type=int, choices=[1, 2, 3, 4], default=1, help="ドローン番号")
     parser.add_argument("--video-host", default="0.0.0.0", help="映像受信の待受ホスト")
-    parser.add_argument("--video-port", type=int, help="映像受信ポート（既定: --drone から自動）")
+    parser.add_argument(
+        "--video-port",
+        "--rx",
+        dest="video_port",
+        type=int,
+        help="映像受信ポート（既定: --drone から自動）",
+    )
     parser.add_argument("--display-host", default="127.0.0.1", help="結果送信先ホスト")
-    parser.add_argument("--display-port", type=int, help="結果送信ポート（既定: --drone から自動）")
+    parser.add_argument(
+        "--display-port",
+        "--tx",
+        dest="display_port",
+        type=int,
+        help="結果送信ポート（既定: --drone から自動）",
+    )
     parser.add_argument("--model", default="yolov8n.pt", help="YOLO モデル")
     parser.add_argument("--conf", type=float, default=0.4, help="検知の信頼度しきい値")
     parser.add_argument("--max-width", type=int, default=480, help="送信画像の最大幅(px)")
     parser.add_argument("--jpeg-quality", type=int, default=60, help="JPEG 品質(1-100)")
     parser.add_argument("--rate", type=float, default=1.0, help="結果送信レート Hz（既定 1Hz）")
+    parser.add_argument("--metrics-interval", type=float, default=10.0, help="メトリクス出力間隔秒")
+    parser.add_argument(
+        "--duration", type=float, default=0.0, help="指定秒数で終了（0ならCtrl-Cまで継続）"
+    )
     parser.add_argument("--image", help="（テスト用）映像の代わりに画像1枚を推論して1回送信")
     return parser.parse_args()
 
 
 def main():
     args = _parse_args()
+    if args.rate <= 0:
+        raise ValueError("--rate は 0 より大きい値を指定してください")
+    if args.metrics_interval < 0:
+        raise ValueError("--metrics-interval は 0 以上を指定してください")
+
     video_port = args.video_port or PI_TO_YOLO_VIDEO_PORTS[args.drone]
     display_port = args.display_port or YOLO_TO_DISPLAY_PORTS[args.drone]
     dest = (args.display_host, display_port)
@@ -120,9 +208,9 @@ def main():
             return
         detections, annotated = detect(model, frame, args.conf)
         result = build_result(args.drone, detections, annotated, args.max_width, args.jpeg_quality)
-        sock.sendto(result.to_json().encode("utf-8"), dest)
+        send_result(sock, dest, result)
         labels = [d.label for d in detections]
-        print(f"sent 1 result -> {dest}: detections={labels}")
+        print(f"detections={labels}")
         sock.close()
         return
 
@@ -131,24 +219,36 @@ def main():
     print(f"opening video: {url}  -> sending results to {dest} @ {args.rate}Hz")
     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
     interval = 1.0 / args.rate
+    metrics = Metrics(args.metrics_interval)
+    started = time.monotonic()
     last_sent = 0.0
     try:
         while True:
+            if args.duration > 0 and time.monotonic() - started >= args.duration:
+                print("\nduration reached.")
+                break
             ok, frame = cap.read()
+            now = time.monotonic()
             if not ok:
                 # 受信できない時は開き直して継続（#11 で堅牢化）
                 cap.release()
                 cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+                metrics.mark_reopen()
+                metrics.maybe_report(now, args.drone, video_port, display_port)
                 continue
-            now = time.monotonic()
+            metrics.mark_read(now)
             if now - last_sent < interval:
+                metrics.maybe_report(now, args.drone, video_port, display_port)
                 continue  # 1Hz に間引き（フレームは読み捨てて最新を使う）
             last_sent = now
             detections, annotated = detect(model, frame, args.conf)
+            metrics.mark_infer(time.monotonic())
             result = build_result(
                 args.drone, detections, annotated, args.max_width, args.jpeg_quality
             )
-            sock.sendto(result.to_json().encode("utf-8"), dest)
+            send_result(sock, dest, result)
+            metrics.mark_sent()
+            metrics.maybe_report(time.monotonic(), args.drone, video_port, display_port)
             print(
                 f"{result.ts}  {drone_id(args.drone)}  detections={[d.label for d in detections]}"
             )
