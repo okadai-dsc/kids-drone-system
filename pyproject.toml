@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     # pi/tellomon が映像処理に使用（`uv run python -m pi.tellomon` をルート env で起動するため）
     "opencv-python>=4.13.0.92",
+    "pillow>=12.0.0",
 ]
 
 # 各サブパッケージ（pi/tellomon, yolo_pc/yolo_proc, operator_pc/*, shared）は
