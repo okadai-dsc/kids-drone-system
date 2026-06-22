@@ -15,6 +15,7 @@ import cv2
 
 from shared.ports import NOTE_PC_IP, PI_TO_YOLO_VIDEO_PORTS
 
+from . import cage
 from .beacon import BeaconSender
 
 # このモジュールが置かれているディレクトリ（gif アセットを実行場所に依らず開くため）
@@ -120,6 +121,16 @@ MSG_SIZE = 1024
 
 # ビデォ転送情報
 VIDEO_FLAG = 0
+
+# --- ケージ制御（#30 / 検収 F5・S2・S3）------------------------------
+# 想定位置（メートル系。表示用キャンバスのレガシー座標とは別管理）を積算し、
+# ケージ外/高度2m超になる移動コマンドを Tello に送らず抑止する。
+CAGE_GUARD = True  # False で抑止を無効化（デバッグ/キャリブレーション用）
+# 離陸時の想定位置(m)。既定はケージ中央。実機では離陸位置に合わせて調整する。
+INIT_X = (cage.CAGE_X[0] + cage.CAGE_X[1]) / 2  # 3.25
+INIT_Y = (cage.CAGE_Y[0] + cage.CAGE_Y[1]) / 2  # 1.75
+INIT_YAW = 0
+DRONE_STATE = cage.DroneState(x=INIT_X, y=INIT_Y, z=0.0, yaw=INIT_YAW)
 
 SrcAddr = ("0.0.0.0", 8890)
 SOCKET_TIMEOUT = 60  # 変更可能
@@ -400,10 +411,29 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         err_queue.put(f"{self.path}:")
 
+        global DRONE_STATE
+
         print("do_GET#Start,message:" + self.path)
         message = self.path + "//"
         opcode = message.split("/")[1]
         param = message.split("/")[2]
+
+        # ケージ制御（#30 / F5・S2・S3）: 想定位置でケージ外 or 高度2m超になる
+        # 移動/上昇コマンドは Tello に送らず抑止する（cage.would_exceed は純粋ロジック）。
+        if CAGE_GUARD and opcode in cage.CAGE_MOTION:
+            try:
+                _param_cm = int(param)
+            except ValueError:
+                _param_cm = 0
+            if cage.would_exceed(DRONE_STATE, opcode, _param_cm):
+                self.send_response(200)
+                self.send_header("Content-type", "text/html")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(bytes("OK(cage-blocked)", "utf-8"))
+                msg_queue.put(f"ケージ抑止: {opcode} {param}")
+                err_queue.put(f"{self.path}:cage-blocked")
+                return
 
         # Telloにコマンドを送信する
         if opcode == "command":
@@ -471,6 +501,17 @@ class HttpHandler(BaseHTTPRequestHandler):
             #            self.wfile.write(bytes("</body></html>", "utf-8"))
 
             self.wfile.write(bytes("OK", "utf-8"))
+
+            # ケージ制御（#30）: 送信成功したコマンドで想定位置を積算する。
+            # takeoff で離陸位置にリセット、移動/回転/上下で dead-reckoning。
+            if opcode == "takeoff":
+                DRONE_STATE = cage.DroneState(x=INIT_X, y=INIT_Y, z=0.0, yaw=INIT_YAW)
+            elif opcode in cage.CAGE_MOTION:
+                try:
+                    _param_cm = int(param)
+                except ValueError:
+                    _param_cm = 0
+                DRONE_STATE = cage.apply_command(DRONE_STATE, opcode, _param_cm)
 
             if opcode == "streamon":
                 VS_FLAG = 0
