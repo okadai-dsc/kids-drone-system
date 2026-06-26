@@ -1078,7 +1078,12 @@ def main():
     t3.start()
 
     # ビーコン送信スレッド（status を 1Hz に間引いてノートPCへ JSON 送信）
-    beacon_sender = BeaconSender(drone_num, lambda: recv.latest, host=args.beacon_host)
+    # #31: status に dead-reckoning の想定位置 x/y を合流させてビーコンへ載せる。
+    # DRONE_STATE はコマンド毎に再代入されるグローバルなので、呼び出し時に都度読む。
+    def _status_with_position():
+        return {**recv.latest, "x": DRONE_STATE.x, "y": DRONE_STATE.y}
+
+    beacon_sender = BeaconSender(drone_num, _status_with_position, host=args.beacon_host)
     beacon_sender.start()
 
     try:
