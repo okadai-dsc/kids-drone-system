@@ -7,6 +7,7 @@ import threading
 import time
 import tkinter as tk
 import tkinter.filedialog
+import tkinter.messagebox
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tkinter import END, NW, VERTICAL, E, IntVar, N, StringVar
@@ -15,7 +16,7 @@ import cv2
 
 from shared.ports import NOTE_PC_IP, PI_TO_YOLO_VIDEO_PORTS
 
-from . import cage
+from . import cage, commands
 from .beacon import BeaconSender
 
 # このモジュールが置かれているディレクトリ（gif アセットを実行場所に依らず開くため）
@@ -435,59 +436,19 @@ class HttpHandler(BaseHTTPRequestHandler):
                 err_queue.put(f"{self.path}:cage-blocked")
                 return
 
-        # Telloにコマンドを送信する
-        if opcode == "command":
-            trn_msg = com.send_cmd(opcode)
-
-        elif opcode == "takeoff":
-            trn_msg = com.send_cmd(opcode)
-            time.sleep(5)
-
-        elif opcode == "land":
-            trn_msg = com.send_cmd(opcode)
-
-        elif opcode == "up":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "down":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "cw":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "ccw":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "forward":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "left":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "back":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "right":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "streamon":
-            trn_msg = com.send_cmd(opcode)
-
-        elif opcode == "streamoff":
-            trn_msg = com.send_cmd(opcode)
-
-        elif opcode == "flip":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "downvision":
-            trn_msg = com.send_cmd(opcode + " " + param)
-
-        elif opcode == "streamwrite":
+        # Telloにコマンドを送信する。送信文字列の組み立ては commands.build_command に一元化。
+        # emergency（モータ即停止、検収 A1/A2）も takeoff/land と同列の SDK コマンド。
+        if opcode == "streamwrite":
+            # 画面キャプチャ指示（Tello へは送らないアプリ内コマンド）
             VS_IMG = 1
             trn_msg = "ok"
-
         else:
-            return
+            cmd = commands.build_command(opcode, param)
+            if cmd is None:
+                return  # 未知 opcode
+            trn_msg = com.send_cmd(cmd)
+            if opcode == "takeoff":
+                time.sleep(5)
 
         if trn_msg == "ok":
             self.send_response(200)
@@ -751,6 +712,11 @@ class View:
         self.start_button = tk.Button(self.msg_frame111, bg="green", text="land")
         self.start_button.pack()
 
+        # 緊急停止ボタン（#27 / 検収 A1）: emergency = モータ即停止。
+        # 誤操作防止に確認ダイアログを挟む。Ctrl+Space でも発火（Controller.set_events）。
+        self.emergency_button = tk.Button(self.msg_frame111, bg="red", fg="white", text="緊急停止")
+        self.emergency_button.pack()
+
         # メッセージ更新用
         self.message = tk.StringVar()
         self.start_button2 = tk.Checkbutton(self.msg_frame112, selectcolor="red", text="通信状態")
@@ -898,8 +864,19 @@ class Controller:
         self.view.load_button["command"] = self.push_load_button
         self.view.reset_button["command"] = self.push_reset_button
 
+        # 緊急停止（#27 / A1）: ボタンと Ctrl+Space ショートカット
+        self.view.emergency_button["command"] = self.push_emergency
+        self.master.bind("<Control-space>", lambda _e: self.push_emergency())
+
         # 画像の描画用のタイマーセット
         self.master.after(Controller.INTERVAL, self.timer)
+
+    def push_emergency(self):
+        "緊急停止ボタン/Ctrl+Space: 確認後に emergency（モータ即停止）を送信する"
+        if not tk.messagebox.askyesno("緊急停止", "全モータを即停止します。よろしいですか？"):
+            return
+        trn_msg = com.send_cmd(commands.build_command("emergency"))
+        self.view.draw_message(f"emergency:{trn_msg}")
 
     def timer(self):
         "一定間隔で各種処理を実行する"
@@ -943,6 +920,11 @@ class Controller:
             elif opcode == "land":
                 self.view.start_button.configure(bg="green")
                 self.view.start_button.configure(text="land")
+                return
+
+            elif opcode == "emergency":
+                self.view.start_button.configure(bg="red")
+                self.view.start_button.configure(text="emergency")
                 return
 
             elif opcode == "up":
