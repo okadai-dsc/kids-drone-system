@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import argparse
 import math
+import time
 import tkinter as tk
 
 from shared.ports import BEACON_PORT
 from shared.schemas import CAGE_X, CAGE_Y
 
 from .receiver import BeaconReceiver, BeaconStore
+from .status import FRESH, GONE, LOST, STALE, is_outside_cage, staleness_level
 
 # --- 表示パラメータ（仕様詳細ドラフト.md §3.4: 1m = 100px）-------------
 SCALE = 100  # px / m
@@ -32,6 +34,8 @@ COLOR_CAGE = "#9E9E9E"
 COLOR_GRID = "#E0E0E0"
 COLOR_DRONE = "#42A5F5"
 COLOR_TEXT = "#212121"
+COLOR_STALE = "#BDBDBD"  # 3秒途絶（半透明風グレー）
+COLOR_LOST = "#E53935"  # 10秒途絶（赤点滅）/ ケージ逸脱の赤枠
 
 
 def cage_to_screen(x: float, y: float) -> tuple[float, float]:
@@ -58,6 +62,8 @@ class MonitorApp:
         self.status = tk.Label(root, text="待受中…", font=("sans-serif", 12), fg=COLOR_TEXT)
         self.status.pack(pady=4)
 
+        self._blink = False  # 赤点滅（LOST 段階）用トグル
+
         self._draw_map()
         self._refresh()
 
@@ -82,24 +88,42 @@ class MonitorApp:
     def _refresh(self) -> None:
         """最新ビーコンでアイコンを再描画する（REFRESH_MS ごと）。"""
         self.canvas.delete("drone")  # 前回のアイコンだけ消す（マップ枠は残す）
-        beacons = self.store.snapshot()
-        for beacon in sorted(beacons.values(), key=lambda b: b.id):
-            self._draw_drone(beacon)
-        n = len(beacons)
-        self.status.config(text=f"受信中: {n} 台" if n else "ビーコン待受中…")
+        self._blink = not self._blink  # 赤点滅（LOST）用トグル
+        items = self.store.snapshot_with_age(time.monotonic())
+        shown = 0
+        for _bid, (beacon, age) in sorted(items.items()):
+            level = staleness_level(age)
+            if level == GONE:
+                continue  # 30秒経過 → 非表示
+            self._draw_drone(beacon, level)
+            shown += 1
+        self.status.config(text=f"受信中: {shown} 台" if shown else "ビーコン待受中…")
         self.root.after(REFRESH_MS, self._refresh)
 
-    def _draw_drone(self, beacon) -> None:
+    def _draw_drone(self, beacon, level: str = FRESH) -> None:
         sx, sy = cage_to_screen(beacon.x, beacon.y)
+
+        # 途絶段階で塗り色を変える（3秒→グレー半透明風 / 10秒→赤点滅）
+        fill = COLOR_DRONE
+        if level == STALE:
+            fill = COLOR_STALE
+        elif level == LOST:
+            fill = COLOR_LOST if self._blink else COLOR_BG  # 点滅
+
+        # ケージ逸脱なら赤枠で強調（設計 5.4.4(4)）
+        outside = is_outside_cage(beacon.x, beacon.y, beacon.z)
+        outline = COLOR_LOST if outside else COLOR_TEXT
+        width = 4 if outside else 2
+
         # 機体アイコン（円）
         self.canvas.create_oval(
             sx - ICON_R,
             sy - ICON_R,
             sx + ICON_R,
             sy + ICON_R,
-            fill=COLOR_DRONE,
-            outline=COLOR_TEXT,
-            width=2,
+            fill=fill,
+            outline=outline,
+            width=width,
             tags="drone",
         )
         # 機首方向（yaw=0 は +Y=画面上、時計回り）
