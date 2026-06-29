@@ -15,7 +15,7 @@ import cv2
 
 from shared.ports import NOTE_PC_IP, PI_TO_YOLO_VIDEO_PORTS
 
-from . import cage
+from . import cage, safety
 from .beacon import BeaconSender
 
 # このモジュールが置かれているディレクトリ（gif アセットを実行場所に依らず開くため）
@@ -341,62 +341,23 @@ class StatusRecever:
 
     def receve_forever(self):
         while True:
-            count = 0
-
-            vgx = 0
-            vgy = 0
-            vgz = 0
-            h_cm = 0
-            battery = 0
-            flight_time = 0
-            yaw = 0
-
-            while count < 1:
-                data, addr = self.udpServSock.recvfrom(MSG_SIZE)
-                count = count + 1
-            #           time.sleep(5)
-            # ソケットにデータを受信した場合受信データを変数に設定
-
             data, addr = self.udpServSock.recvfrom(MSG_SIZE)
-            # 受信データと送信アドレスを出力
-            #            print("\nreceve_forever#Recv,data:%s " % data.decode(encoding='utf-8'))
-            data2 = data.decode(encoding="utf-8")
-            data_list = data2.split(";")
-            for val in data_list:
-                if val.split(":")[0] == "h":
-                    h_cm = int(val.split(":")[1])
-                    self.view.koudo_var.set(h_cm)
-
-                if val.split(":")[0] == "bat":
-                    battery = int(val.split(":")[1])
-                    self.view.dengen_var.set(battery)
-
-                if val.split(":")[0] == "time":
-                    #                    print("\nreceve_forever#Recv,bat:%s " % val.split(':')[1])
-                    flight_time = int(val.split(":")[1])
-                    self.view.hikouzikan_var.set(flight_time)
-
-                if val.split(":")[0] == "yaw":
-                    yaw = int(val.split(":")[1])
-
-                if val.split(":")[0] == "vgx":
-                    vgx = int(val.split(":")[1])
-                if val.split(":")[0] == "vgy":
-                    vgy = int(val.split(":")[1])
-                if val.split(":")[0] == "vgz":
-                    vgz = int(val.split(":")[1])
-
-            speed = vgx * vgx + vgy * vgy + vgz * vgz
-            self.view.sokudo_var.set(int(math.sqrt(speed)))
+            # ステータス文字列のパースは safety.parse_tello_status に一元化（#29）。
+            status = safety.parse_tello_status(data.decode(encoding="utf-8", errors="ignore"))
+            self.view.koudo_var.set(status["height_cm"])
+            self.view.dengen_var.set(status["battery"])
+            self.view.hikouzikan_var.set(status["flight_time"])
+            self.view.sokudo_var.set(status["speed_cm_s"])
 
             # ビーコン送信スレッド用に最新ステータスを保持
             self.latest = {
-                "height_cm": h_cm,
-                "battery": battery,
-                "flight_time": flight_time,
-                "yaw": yaw,
+                "height_cm": status["height_cm"],
+                "battery": status["battery"],
+                "flight_time": status["flight_time"],
+                "yaw": status["yaw"],
             }
 
+            # status を受信したので通信健全カウンタをリセット
             Controller.HEALTH_COUNTER = 0
 
 
@@ -695,6 +656,16 @@ class View:
         )
         self.dengen.pack()
 
+        # バッテリ % の数値表示（#29 / A4）。20% 以下で赤枠で囲って警告する。
+        self.dengen_pct = tk.Label(
+            self.state_frame12,
+            textvariable=self.dengen_var,
+            font=("sans-serif", 11, "bold"),
+            highlightthickness=2,
+            highlightbackground=self.state_frame12.cget("bg"),
+        )
+        self.dengen_pct.pack(pady=2)
+
         # 飛行時間表示
         self.hikouzikan_label = tk.Label(self.state_frame22, text="飛行時間(秒)")
         self.hikouzikan_label.pack()
@@ -872,6 +843,14 @@ class View:
         self.message_text.delete("1.0", END)
         self.message_text.insert("1.0", message)
 
+    def set_battery_warning(self, low):
+        "バッテリ 20% 以下のとき % 表示を赤枠で囲う（#29 / A4）。"
+        if low:
+            self.dengen_pct.configure(highlightbackground="red", fg="red")
+        else:
+            normal = self.state_frame12.cget("bg")
+            self.dengen_pct.configure(highlightbackground=normal, fg="black")
+
     def select_file(self):
         "ファイル選択画面を表示"
         file_path = tk.filedialog.askopenfilename(initialdir=".")
@@ -888,6 +867,9 @@ class Controller:
 
         # ラベル表示メッセージ管理用
         self.message = ""
+
+        # 飛行中フラグ（#29 / A3）: 通信断の自動着陸は飛行中のみ・1 回だけ送る。
+        self.airborne = False
 
         self.set_events()
 
@@ -915,6 +897,15 @@ class Controller:
         else:
             self.view.start_button2.configure(selectcolor="green")
 
+        # 通信断 3 秒で自動着陸（#29 / A3）。飛行中のみ・1 回だけ land を送る。
+        if self.airborne and safety.should_autoland(Controller.HEALTH_COUNTER, Controller.INTERVAL):
+            com.send_cmd("land")
+            self.airborne = False
+            self.view.draw_message("通信断: 自動着陸しました")
+
+        # バッテリ 20% 以下で % 表示を赤枠化（#29 / A4）
+        self.view.set_battery_warning(safety.is_low_battery(self.view.dengen_var.get()))
+
         # 再度タイマー設定
         self.master.after(Controller.INTERVAL, self.timer)
 
@@ -938,11 +929,13 @@ class Controller:
             elif opcode == "takeoff":
                 self.view.start_button.configure(bg="cyan")
                 self.view.start_button.configure(text="takeoff")
+                self.airborne = True  # 飛行中（#29 / A3）
                 return
 
             elif opcode == "land":
                 self.view.start_button.configure(bg="green")
                 self.view.start_button.configure(text="land")
+                self.airborne = False  # 着陸済み（#29 / A3）
                 return
 
             elif opcode == "up":
