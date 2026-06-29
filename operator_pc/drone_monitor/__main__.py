@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import argparse
 import math
+import threading
 import time
 import tkinter as tk
+from tkinter import messagebox
 
 from shared.ports import BEACON_PORT
 from shared.schemas import CAGE_X, CAGE_Y
 
+from ..emergency import emergency_all
 from .receiver import BeaconReceiver, BeaconStore
 from .status import FRESH, GONE, LOST, STALE, is_outside_cage, staleness_level
 
@@ -62,10 +65,33 @@ class MonitorApp:
         self.status = tk.Label(root, text="待受中…", font=("sans-serif", 12), fg=COLOR_TEXT)
         self.status.pack(pady=4)
 
+        # 全機緊急停止ボタン（#28 / 検収 F14・A2・P2）。押下→確認→全 Pi へ emergency 並列送信。
+        self.emergency_button = tk.Button(
+            root,
+            text="全機緊急停止",
+            bg="#D32F2F",
+            fg="white",
+            font=("sans-serif", 14, "bold"),
+            command=self._on_emergency,
+        )
+        self.emergency_button.pack(pady=6, fill=tk.X, padx=20)
         self._blink = False  # 赤点滅（LOST 段階）用トグル
 
         self._draw_map()
         self._refresh()
+
+    def _on_emergency(self) -> None:
+        """全機緊急停止ボタン押下時: 確認ダイアログ後に全 Pi へ並列送信する。"""
+        if not messagebox.askyesno("全機緊急停止", "全ドローンを緊急停止します。よろしいですか？"):
+            return
+
+        def _run() -> None:
+            results = emergency_all()
+            ok = sum(1 for v in results.values() if v)
+            self.status.configure(text=f"全機緊急停止: {ok}/{len(results)} 機へ送信")
+
+        # UI を固めないよう別スレッドで送信（送信自体も内部で並列）。
+        threading.Thread(target=_run, daemon=True).start()
 
     def _draw_map(self) -> None:
         """ケージ枠と 1m グリッドを描く（一度だけ）。"""
