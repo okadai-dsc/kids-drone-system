@@ -29,6 +29,7 @@ from ultralytics import YOLO
 # 親ディレクトリの shared をインポートできるようにパスを追加（#9 の流儀に合わせる）
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.ports import PI_TO_YOLO_VIDEO_PORTS, YOLO_TO_DISPLAY_PORTS  # noqa: E402
+from shared.rate import interval_for_rate, should_send  # noqa: E402
 from shared.schemas import DETECT_LABELS, Detection, YoloResult, drone_id, now_iso  # noqa: E402
 
 # 検知枠の色（cat/dog で色分け。BGR）
@@ -176,7 +177,9 @@ def _parse_args():
     parser.add_argument("--conf", type=float, default=0.4, help="検知の信頼度しきい値")
     parser.add_argument("--max-width", type=int, default=480, help="送信画像の最大幅(px)")
     parser.add_argument("--jpeg-quality", type=int, default=60, help="JPEG 品質(1-100)")
-    parser.add_argument("--rate", type=float, default=1.0, help="結果送信レート Hz（既定 1Hz）")
+    parser.add_argument(
+        "--rate", type=float, default=5.0, help="結果送信レート Hz（既定 5Hz / 検収 P1）"
+    )
     parser.add_argument("--metrics-interval", type=float, default=10.0, help="メトリクス出力間隔秒")
     parser.add_argument(
         "--duration", type=float, default=0.0, help="指定秒数で終了（0ならCtrl-Cまで継続）"
@@ -187,8 +190,7 @@ def _parse_args():
 
 def main():
     args = _parse_args()
-    if args.rate <= 0:
-        raise ValueError("--rate は 0 より大きい値を指定してください")
+    interval = interval_for_rate(args.rate)  # rate<=0 はここで ValueError
     if args.metrics_interval < 0:
         raise ValueError("--metrics-interval は 0 以上を指定してください")
 
@@ -218,7 +220,6 @@ def main():
     url = f"udp://@{args.video_host}:{video_port}"
     print(f"opening video: {url}  -> sending results to {dest} @ {args.rate}Hz")
     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-    interval = 1.0 / args.rate
     metrics = Metrics(args.metrics_interval)
     started = time.monotonic()
     last_sent = 0.0
@@ -237,9 +238,9 @@ def main():
                 metrics.maybe_report(now, args.drone, video_port, display_port)
                 continue
             metrics.mark_read(now)
-            if now - last_sent < interval:
+            if not should_send(now, last_sent, interval):
                 metrics.maybe_report(now, args.drone, video_port, display_port)
-                continue  # 1Hz に間引き（フレームは読み捨てて最新を使う）
+                continue  # 指定レートに間引き（フレームは読み捨てて最新を使う）
             last_sent = now
             detections, annotated = detect(model, frame, args.conf)
             metrics.mark_infer(time.monotonic())
