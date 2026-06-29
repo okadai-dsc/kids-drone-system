@@ -26,19 +26,21 @@ def _clamp(value: float, lo: float, hi: float) -> float:
 def build_beacon(drone_num: int, status: dict) -> Beacon:
     """Tello status の最新値からビーコンを組み立てる（純粋関数）。
 
-    status は {"battery","height_cm","flight_time","yaw"} を想定。
+    status は {"battery","height_cm","flight_time","yaw","x","y"} を想定。
     起動直後など値が無いキーは 0 とみなす。
 
-    x/y（ケージ内 m 座標）は Tello から取得できないため、当面は
-    ケージ中央の固定値を入れる。
-    TODO: 屋内測位（外部カメラ/UWB 等）が決まったら実値に差し替える（別 issue）。
+    x/y（ケージ内 m 座標）は cage.py の dead-reckoning による想定位置を
+    status 経由で受け取る（#31）。status に無ければケージ中央にフォールバックする。
+    いずれもケージ範囲にクランプする。z（高度）は Tello の実測高さ、yaw も実測値を使う。
     """
     height_cm = status.get("height_cm", 0)
+    x = _clamp(float(status.get("x", _CAGE_CENTER_X)), CAGE_X[0], CAGE_X[1])
+    y = _clamp(float(status.get("y", _CAGE_CENTER_Y)), CAGE_Y[0], CAGE_Y[1])
     return Beacon(
         id=drone_id(drone_num),
         ts=now_iso(),
-        x=round(_CAGE_CENTER_X, 2),
-        y=round(_CAGE_CENTER_Y, 2),
+        x=round(x, 2),
+        y=round(y, 2),
         z=round(_clamp(height_cm / 100, CAGE_Z[0], CAGE_Z[1]), 2),
         yaw=int(status.get("yaw", 0)) % 360,
         battery=int(status.get("battery", 0)),
