@@ -91,6 +91,7 @@ cd build && python3 -m http.server 8601    # もしくは nginx 等
 ## 関連ドキュメント
 
 - システム構成：[../README.md](../README.md)
+- Raspberry Pi セットアップ（Buster / armv7l troubleshooting 含む）：[raspi-setup.md](raspi-setup.md)
 - 仕様詳細：[開発者補足/仕様詳細ドラフト.md](開発者補足/仕様詳細ドラフト.md)
 - ポート一覧：[開発者補足/ポート一覧.md](開発者補足/ポート一覧.md)
 - 開発計画（Week 単位）：[開発者補足/開発計画.md](開発者補足/開発計画.md)

@@ -41,13 +41,18 @@ flowchart LR
 | `operator_pc/yolo_display/` | 中央ノートPC の YOLO 結果表示 |
 | `shared/` | ポート番号・JSON フォーマット等の共通定義 |
 | `Scratch/` | 子供向け UI（LLK 公式 clone + drone 拡張 / **git 管理外**）|
-| `docs/` | 開発フロー（`development.md`）のみ。設計書・計画書・PDF・図はリポジトリ管理外（手元 / Drive 等で管理）|
+| `docs/` | 開発フロー・セットアップ・検証メモ（`development.md` / `raspi-setup.md` / `network-setup.md` ほか）。設計書・計画書・PDF・図はリポジトリ管理外（手元 / Drive 等で管理）|
 
 > `Scratch/` は LLK 公式リポジトリの clone のため `.gitignore` で除外しています。drone 拡張の改造は消失リスク回避のため **`okadai-dsc` に fork 済み**（`okadai-dsc/scratch-vm`・`okadai-dsc/scratch-gui` の `drone` ブランチ）。セットアップ手順は [docs/development.md](docs/development.md) を参照。submodule 化は必要が出たら別 issue で対応します。
 
 ## ドキュメント
 
-設計書（正本）・計画書・ポート定義・仕様詳細ドラフト・PDF・図は **リポジトリ管理外**（手元 / Drive 等で管理）。リポジトリに含むのは開発フロー [docs/development.md](docs/development.md) のみ。
+設計書（正本）・計画書・ポート定義・仕様詳細ドラフト・PDF・図は **リポジトリ管理外**（手元 / Drive 等で管理）。リポジトリに含むのは次の開発メモ：
+
+- 開発フロー：[docs/development.md](docs/development.md)
+- Raspberry Pi セットアップ（Buster / armv7l troubleshooting 含む）：[docs/raspi-setup.md](docs/raspi-setup.md)
+- ネットワーク設定メモ：[docs/network-setup.md](docs/network-setup.md)
+- 1台 E2E 検証：[docs/demo.md](docs/demo.md)
 
 ## 体制
 
