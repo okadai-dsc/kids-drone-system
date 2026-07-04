@@ -26,6 +26,7 @@ tello/tellomon.py.[0-9]*
 docs/*
 !docs/development.md
 !docs/demo.md
+!docs/network-setup.md
 !docs/.gitkeep
 *.pt
 .claude/settings.local.json
