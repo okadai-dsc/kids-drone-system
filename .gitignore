@@ -27,6 +27,7 @@ docs/*
 !docs/development.md
 !docs/demo.md
 !docs/network-setup.md
+!docs/raspi-setup.md
 !docs/.gitkeep
 *.pt
 .claude/settings.local.json
