@@ -47,12 +47,18 @@ flowchart LR
 
 ## ドキュメント
 
-設計書（正本）・計画書・ポート定義・仕様詳細ドラフト・PDF・図は **リポジトリ管理外**（手元 / Drive 等で管理）。リポジトリに含むのは次の開発メモ：
+設計書（正本）・計画書・仕様詳細ドラフト・PDF・図は **リポジトリ管理外**（手元 / Drive 等で管理）。ポート・IP の正本はコード側の [shared/ports.py](shared/ports.py)。
 
-- 開発フロー：[docs/development.md](docs/development.md)
-- Raspberry Pi セットアップ（Buster / armv7l troubleshooting 含む）：[docs/raspi-setup.md](docs/raspi-setup.md)
-- ネットワーク設定メモ：[docs/network-setup.md](docs/network-setup.md)
-- 1台 E2E 検証：[docs/demo.md](docs/demo.md)
+やりたいことから読む文書を選ぶ：
+
+| やりたいこと | 読むもの |
+|---|---|
+| 開発に参加する（uv 環境・ブランチ運用・Scratch ビルド）| [docs/development.md](docs/development.md) |
+| Raspberry Pi を1台構築する（Buster 標準ルート）| [docs/raspi-setup.md](docs/raspi-setup.md) |
+| 中央ノートPC（YOLO PC）を構築する | [docs/yolopc-setup.md](docs/yolopc-setup.md) |
+| ネットワークの考え方・疎通確認を知る | [docs/network-setup.md](docs/network-setup.md) |
+| 1台 E2E デモを再現する（リハ構成）| [docs/demo.md](docs/demo.md) |
+| 過去の検証記録・ハマりどころを知る | [docs/e2e-1drone.md](docs/e2e-1drone.md) |
 
 ## 体制
 
