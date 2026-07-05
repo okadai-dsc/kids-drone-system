@@ -49,25 +49,29 @@ def cage_to_screen(x: float, y: float) -> tuple[float, float]:
 
 
 class MonitorApp:
-    def __init__(self, root: tk.Tk, store: BeaconStore) -> None:
-        self.root = root
+    """飛行マップ＋全機緊急停止ボタン。
+
+    parent には Tk ルートのほか Frame も渡せる（#34 の統合モニタが右ペインとして埋め込む）。
+    """
+
+    def __init__(self, parent: tk.Misc, store: BeaconStore) -> None:
+        self.parent = parent
         self.store = store
-        root.title("ドローンモニタ")
 
         self.canvas = tk.Canvas(
-            root,
+            parent,
             width=MAP_W + MARGIN * 2,
             height=MAP_H + MARGIN * 2,
             bg=COLOR_BG,
             highlightthickness=0,
         )
         self.canvas.pack()
-        self.status = tk.Label(root, text="待受中…", font=("sans-serif", 12), fg=COLOR_TEXT)
+        self.status = tk.Label(parent, text="待受中…", font=("sans-serif", 12), fg=COLOR_TEXT)
         self.status.pack(pady=4)
 
         # 全機緊急停止ボタン（#28 / 検収 F14・A2・P2）。押下→確認→全 Pi へ emergency 並列送信。
         self.emergency_button = tk.Button(
-            root,
+            parent,
             text="全機緊急停止",
             bg="#D32F2F",
             fg="white",
@@ -124,7 +128,7 @@ class MonitorApp:
             self._draw_drone(beacon, level)
             shown += 1
         self.status.config(text=f"受信中: {shown} 台" if shown else "ビーコン待受中…")
-        self.root.after(REFRESH_MS, self._refresh)
+        self.parent.after(REFRESH_MS, self._refresh)
 
     def _draw_drone(self, beacon, level: str = FRESH) -> None:
         sx, sy = cage_to_screen(beacon.x, beacon.y)
@@ -181,6 +185,7 @@ def main() -> None:
     receiver.start()
 
     root = tk.Tk()
+    root.title("ドローンモニタ")
     MonitorApp(root, store)
     try:
         root.mainloop()

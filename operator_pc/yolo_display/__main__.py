@@ -50,13 +50,18 @@ class CellState:
 
 
 class YoloDisplayApp:
+    """検知タイル（2×2）表示。
+
+    parent には Tk ルートのほか Frame も渡せる（#34 の統合モニタが左ペインとして埋め込む）。
+    """
+
     def __init__(
         self,
-        root: tk.Tk,
+        parent: tk.Misc,
         inbox: queue.Queue[YoloResult],
         receiver: YoloResultReceiver | None = None,
     ) -> None:
-        self.root = root
+        self.parent = parent
         self.inbox = inbox
         self.receiver = receiver
         self.cells: dict[tuple[str, str], CellState] = {}
@@ -68,11 +73,7 @@ class YoloDisplayApp:
         self.image_photos: dict[str, ImageTk.PhotoImage] = {}
         self._closed = False
 
-        root.title("YOLO 結果表示")
-        root.configure(bg=COLOR_BG)
-        root.geometry("1120x760")
-        root.minsize(980, 680)
-        root.protocol("WM_DELETE_WINDOW", self.close)
+        parent.configure(bg=COLOR_BG)
 
         self.font_cell = (self._pick_font(), 14, "bold")
         self.font_header = (self._pick_font(), 18, "bold")
@@ -93,7 +94,7 @@ class YoloDisplayApp:
         return "sans-serif"
 
     def _build_layout(self) -> None:
-        top = tk.Frame(self.root, bg=COLOR_BG)
+        top = tk.Frame(self.parent, bg=COLOR_BG)
         top.pack(fill=tk.X, padx=20, pady=(16, 8))
 
         title = tk.Label(
@@ -105,7 +106,7 @@ class YoloDisplayApp:
         )
         title.pack(side=tk.LEFT)
 
-        image_grid = tk.Frame(self.root, bg=COLOR_BG)
+        image_grid = tk.Frame(self.parent, bg=COLOR_BG)
         image_grid.pack(fill=tk.BOTH, expand=True, padx=20, pady=(6, 10))
         for row in range(2):
             image_grid.rowconfigure(row, weight=1, uniform="image-row")
@@ -160,7 +161,7 @@ class YoloDisplayApp:
                 self.cells[(tello_id, label)] = CellState(label=label)
 
         self.status = tk.Label(
-            self.root,
+            self.parent,
             text="UDP 11212〜11215 待受中",
             font=self.font_status,
             bg=COLOR_BG,
@@ -205,7 +206,7 @@ class YoloDisplayApp:
         if self.receiver is not None:
             self.receiver.stop()
         try:
-            self.root.destroy()
+            self.parent.winfo_toplevel().destroy()
         except tk.TclError:
             pass
 
@@ -216,7 +217,7 @@ class YoloDisplayApp:
             except queue.Empty:
                 break
             self.apply_result(result)
-        self.root.after(POLL_MS, self._poll_inbox)
+        self.parent.after(POLL_MS, self._poll_inbox)
 
     def _expire_cells(self) -> None:
         now = time.monotonic()
@@ -225,7 +226,7 @@ class YoloDisplayApp:
                 state.last_detected = 0.0
                 tello_id, _label = key
                 self._refresh_drone_indicator(tello_id)
-        self.root.after(100, self._expire_cells)
+        self.parent.after(100, self._expire_cells)
 
     def _set_drone_detected(self, tello_id: str, detected_labels: set[str]) -> None:
         text = " / ".join(LABEL_TEXT[label] for label in sorted(detected_labels))
@@ -294,7 +295,11 @@ def main() -> None:
         receiver.start()
 
     root = tk.Tk()
+    root.title("YOLO 結果表示")
+    root.geometry("1120x760")
+    root.minsize(980, 680)
     app = YoloDisplayApp(root, inbox, receiver=receiver)
+    root.protocol("WM_DELETE_WINDOW", app.close)
     try:
         root.mainloop()
     finally:
