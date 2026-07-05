@@ -18,7 +18,7 @@ import tkinter as tk
 from dataclasses import dataclass
 from tkinter import font as tkfont
 
-from PIL import Image, ImageTk
+from PIL import Image, ImageOps, ImageTk
 
 from shared.ports import YOLO_TO_DISPLAY_PORTS
 from shared.schemas import DETECT_LABELS, Detection, YoloResult, drone_id, now_iso
@@ -71,6 +71,8 @@ class YoloDisplayApp:
         self.image_titles: dict[str, tk.Label] = {}
         self.image_badges: dict[str, tk.Label] = {}
         self.image_photos: dict[str, ImageTk.PhotoImage] = {}
+        self.image_srcs: dict[str, Image.Image] = {}  # 最新フレーム原本（リサイズ時に引き直す）
+        self._render_sizes: dict[str, tuple[int, int]] = {}
         self._closed = False
 
         parent.configure(bg=COLOR_BG)
@@ -152,6 +154,7 @@ class YoloDisplayApp:
                 fg=COLOR_INACTIVE_TEXT,
             )
             image_label.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
+            image_label.bind("<Configure>", lambda _e, tid=tello_id: self._on_tile_resize(tid))
             self.image_panels[tello_id] = panel
             self.image_titles[tello_id] = title
             self.image_badges[tello_id] = badge
@@ -253,17 +256,39 @@ class YoloDisplayApp:
         try:
             raw = base64.b64decode(image_b64)
             image = Image.open(io.BytesIO(raw))
-            image.thumbnail((480, 240))
-            self.image_photos[tello_id] = ImageTk.PhotoImage(image)
+            image.load()
+            self.image_srcs[tello_id] = image
         except (ValueError, OSError) as exc:
             self.status.configure(text=f"画像デコードエラー: {exc}", fg=COLOR_WARNING)
             return
-        self.image_labels[tello_id].configure(
-            image=self.image_photos[tello_id],
-            text="",
-            bg=COLOR_PANEL,
-        )
+        self._render_image(tello_id)
         self.status.configure(fg=COLOR_TEXT)
+
+    def _render_image(self, tello_id: str) -> None:
+        """最新フレームをタイルの現在サイズいっぱいに描く（縦横比は維持、拡大も許可）。"""
+        src = self.image_srcs.get(tello_id)
+        if src is None:
+            return
+        label = self.image_labels[tello_id]
+        # 描画先より一回り小さく収める。ここで label の要求サイズが実サイズを超えないので
+        # 「画像が大きくなる→タイルが広がる→さらに拡大…」のループにはならない。
+        w = label.winfo_width() - 8
+        h = label.winfo_height() - 8
+        if w < 50 or h < 50:  # レイアウト確定前（初回パケットがすぐ来た場合）
+            w, h = 480, 240
+        resized = ImageOps.contain(src, (w, h))
+        self.image_photos[tello_id] = ImageTk.PhotoImage(resized)
+        label.configure(image=self.image_photos[tello_id], text="", bg=COLOR_PANEL)
+
+    def _on_tile_resize(self, tello_id: str) -> None:
+        """タイルのサイズが大きく変わったら保持中のフレームを引き直す。"""
+        label = self.image_labels[tello_id]
+        size = (label.winfo_width(), label.winfo_height())
+        last = self._render_sizes.get(tello_id)
+        if last is not None and abs(size[0] - last[0]) < 16 and abs(size[1] - last[1]) < 16:
+            return  # 微小な揺れでは引き直さない（Configure の連鎖を防ぐ）
+        self._render_sizes[tello_id] = size
+        self._render_image(tello_id)
 
     def _dummy_result(self, drone_num: int, label: str) -> YoloResult:
         return YoloResult(

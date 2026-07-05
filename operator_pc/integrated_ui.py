@@ -64,10 +64,11 @@ def build_ui(
     left = tk.Frame(root, bg=COLOR_BG)
     left.grid(row=0, column=0, sticky="nsew")
     right = tk.Frame(root, bg=COLOR_BG)
-    right.grid(row=0, column=1, sticky="ns", padx=(0, 12))
+    right.grid(row=0, column=1, sticky="nsew", padx=(0, 12))
     root.rowconfigure(0, weight=1)
-    root.columnconfigure(0, weight=1)  # タイル側だけ伸縮（マップは固定縮尺 1m=100px）
-    root.columnconfigure(1, weight=0)
+    # 左右とも伸縮させる。タイル画像もマップもペインの実サイズに合わせて自動拡縮する
+    root.columnconfigure(0, weight=1, uniform="pane")
+    root.columnconfigure(1, weight=1, uniform="pane")
 
     yolo_app = YoloDisplayApp(left, inbox, receiver=yolo_receiver)
     monitor_app = MonitorApp(right, store)

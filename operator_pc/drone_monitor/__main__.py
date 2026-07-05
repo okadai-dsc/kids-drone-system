@@ -23,10 +23,10 @@ from ..emergency import emergency_all
 from .receiver import BeaconReceiver, BeaconStore
 from .status import FRESH, GONE, LOST, STALE, is_outside_cage, staleness_level
 
-# --- 表示パラメータ（仕様詳細ドラフト.md §3.4: 1m = 100px）-------------
-SCALE = 100  # px / m
+# --- 表示パラメータ（仕様詳細ドラフト.md §3.4）-------------------------
+SCALE = 100  # px / m（初期値。ペインの大きさに合わせて自動で拡縮する）
 MARGIN = 20  # マップ外周の余白(px)
-MAP_W = int((CAGE_X[1] - CAGE_X[0]) * SCALE)  # 650
+MAP_W = int((CAGE_X[1] - CAGE_X[0]) * SCALE)  # 650（初期キャンバスサイズ用）
 MAP_H = int((CAGE_Y[1] - CAGE_Y[0]) * SCALE)  # 350
 ICON_R = 14  # アイコン半径(px)
 REFRESH_MS = 200  # 再描画間隔
@@ -39,13 +39,6 @@ COLOR_DRONE = "#42A5F5"
 COLOR_TEXT = "#212121"
 COLOR_STALE = "#BDBDBD"  # 3秒途絶（半透明風グレー）
 COLOR_LOST = "#E53935"  # 10秒途絶（赤点滅）/ ケージ逸脱の赤枠
-
-
-def cage_to_screen(x: float, y: float) -> tuple[float, float]:
-    """ケージ座標(m, 左下原点) → 画面座標(px, 左上原点)。y を上下反転する。"""
-    sx = MARGIN + (x - CAGE_X[0]) * SCALE
-    sy = MARGIN + (CAGE_Y[1] - y) * SCALE  # y=0(下) が画面下に来るよう反転
-    return sx, sy
 
 
 class MonitorApp:
@@ -65,7 +58,11 @@ class MonitorApp:
             bg=COLOR_BG,
             highlightthickness=0,
         )
-        self.canvas.pack()
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        # 縮尺と原点はキャンバスの実サイズから決める（マップをペインいっぱいに広げる）
+        self._scale = float(SCALE)
+        self._offset = (float(MARGIN), float(MARGIN))
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
         self.status = tk.Label(parent, text="待受中…", font=("sans-serif", 12), fg=COLOR_TEXT)
         self.status.pack(pady=4)
 
@@ -78,7 +75,7 @@ class MonitorApp:
             font=("sans-serif", 14, "bold"),
             command=self._on_emergency,
         )
-        self.emergency_button.pack(pady=6, fill=tk.X, padx=20)
+        self.emergency_button.pack(pady=(6, 12), fill=tk.X, padx=20)
         self._blink = False  # 赤点滅（LOST 段階）用トグル
 
         self._draw_map()
@@ -97,23 +94,44 @@ class MonitorApp:
         # UI を固めないよう別スレッドで送信（送信自体も内部で並列）。
         threading.Thread(target=_run, daemon=True).start()
 
+    def _on_canvas_resize(self, event: tk.Event) -> None:
+        """キャンバスの実サイズから縮尺を再計算する（アスペクト比維持・中央寄せ）。"""
+        span_x = CAGE_X[1] - CAGE_X[0]
+        span_y = CAGE_Y[1] - CAGE_Y[0]
+        scale = min((event.width - MARGIN * 2) / span_x, (event.height - MARGIN * 2) / span_y)
+        self._scale = max(scale, 30.0)  # 極端に潰れないよう下限を設ける
+        self._offset = (
+            (event.width - span_x * self._scale) / 2,
+            (event.height - span_y * self._scale) / 2,
+        )
+        self._draw_map()
+
+    def _cage_to_screen(self, x: float, y: float) -> tuple[float, float]:
+        """ケージ座標(m, 左下原点) → 画面座標(px, 左上原点)。y を上下反転する。"""
+        ox, oy = self._offset
+        sx = ox + (x - CAGE_X[0]) * self._scale
+        sy = oy + (CAGE_Y[1] - y) * self._scale  # y=0(下) が画面下に来るよう反転
+        return sx, sy
+
     def _draw_map(self) -> None:
-        """ケージ枠と 1m グリッドを描く（一度だけ）。"""
-        x0, y0 = cage_to_screen(CAGE_X[0], CAGE_Y[1])  # 左上
-        x1, y1 = cage_to_screen(CAGE_X[1], CAGE_Y[0])  # 右下
+        """ケージ枠と 1m グリッドを描く（リサイズのたびに引き直す）。"""
+        self.canvas.delete("static")
+        x0, y0 = self._cage_to_screen(CAGE_X[0], CAGE_Y[1])  # 左上
+        x1, y1 = self._cage_to_screen(CAGE_X[1], CAGE_Y[0])  # 右下
         # 1m グリッド
         gx = CAGE_X[0] + 1
         while gx < CAGE_X[1]:
-            sx, _ = cage_to_screen(gx, 0)
-            self.canvas.create_line(sx, y0, sx, y1, fill=COLOR_GRID)
+            sx, _ = self._cage_to_screen(gx, 0)
+            self.canvas.create_line(sx, y0, sx, y1, fill=COLOR_GRID, tags="static")
             gx += 1
         gy = CAGE_Y[0] + 1
         while gy < CAGE_Y[1]:
-            _, sy = cage_to_screen(0, gy)
-            self.canvas.create_line(x0, sy, x1, sy, fill=COLOR_GRID)
+            _, sy = self._cage_to_screen(0, gy)
+            self.canvas.create_line(x0, sy, x1, sy, fill=COLOR_GRID, tags="static")
             gy += 1
         # ケージ外枠
-        self.canvas.create_rectangle(x0, y0, x1, y1, outline=COLOR_CAGE, width=2)
+        self.canvas.create_rectangle(x0, y0, x1, y1, outline=COLOR_CAGE, width=2, tags="static")
+        self.canvas.tag_lower("static")  # 次の再描画までアイコンを隠さない
 
     def _refresh(self) -> None:
         """最新ビーコンでアイコンを再描画する（REFRESH_MS ごと）。"""
@@ -131,7 +149,7 @@ class MonitorApp:
         self.parent.after(REFRESH_MS, self._refresh)
 
     def _draw_drone(self, beacon, level: str = FRESH) -> None:
-        sx, sy = cage_to_screen(beacon.x, beacon.y)
+        sx, sy = self._cage_to_screen(beacon.x, beacon.y)
 
         # 途絶段階で塗り色を変える（3秒→グレー半透明風 / 10秒→赤点滅）
         fill = COLOR_DRONE
