@@ -16,8 +16,7 @@ import cv2
 
 from shared.ports import NOTE_PC_IP, PI_TO_YOLO_VIDEO_PORTS
 
-from . import cage, commands
-from . import safety
+from . import cage, commands, safety
 from .beacon import BeaconSender
 
 # このモジュールが置かれているディレクトリ（gif アセットを実行場所に依らず開くため）
