@@ -17,11 +17,11 @@ import tkinter as tk
 from tkinter import messagebox
 
 from shared.ports import BEACON_PORT
-from shared.schemas import CAGE_X, CAGE_Y
+from shared.schemas import CAGE_X, CAGE_Y, HOME_POSITIONS
 
 from ..emergency import emergency_all
 from .receiver import BeaconReceiver, BeaconStore
-from .status import FRESH, GONE, LOST, STALE, is_outside_cage, staleness_level
+from .status import FRESH, GONE, LOST, STALE, is_cage_warning, is_low_battery, staleness_level
 
 # --- 表示パラメータ（仕様詳細ドラフト.md §3.4）-------------------------
 SCALE = 100  # px / m（初期値。ペインの大きさに合わせて自動で拡縮する）
@@ -131,6 +131,21 @@ class MonitorApp:
             gy += 1
         # ケージ外枠
         self.canvas.create_rectangle(x0, y0, x1, y1, outline=COLOR_CAGE, width=2, tags="static")
+        # 離着陸ホームポジションの目印（＋印と機体番号）。定位置に戻ったかの確認と、
+        # 機体番号と置き位置の不一致（置き間違い）の検出に使う。
+        for num, (hx, hy) in HOME_POSITIONS.items():
+            sx, sy = self._cage_to_screen(hx, hy)
+            r = 7
+            self.canvas.create_line(sx - r, sy, sx + r, sy, fill=COLOR_CAGE, width=2, tags="static")
+            self.canvas.create_line(sx, sy - r, sx, sy + r, fill=COLOR_CAGE, width=2, tags="static")
+            self.canvas.create_text(
+                sx + r + 8,
+                sy + r + 4,
+                text=str(num),
+                font=("sans-serif", 10),
+                fill=COLOR_CAGE,
+                tags="static",
+            )
         self.canvas.tag_lower("static")  # 次の再描画までアイコンを隠さない
 
     def _refresh(self) -> None:
@@ -158,10 +173,11 @@ class MonitorApp:
         elif level == LOST:
             fill = COLOR_LOST if self._blink else COLOR_BG  # 点滅
 
-        # ケージ逸脱なら赤枠で強調（設計 5.4.4(4)）
-        outside = is_outside_cage(beacon.x, beacon.y, beacon.z)
-        outline = COLOR_LOST if outside else COLOR_TEXT
-        width = 4 if outside else 2
+        # ケージ境界に近づいたら赤枠で事前警告（設計 5.4.4(4) の逸脱検知を警告に変更。
+        # ケージ外コマンドは制御側が抑止するため、表示側は警告ゾーンで先に知らせる）
+        warning = is_cage_warning(beacon.x, beacon.y, beacon.z)
+        outline = COLOR_LOST if warning else COLOR_TEXT
+        width = 4 if warning else 2
 
         # 機体アイコン（円）
         self.canvas.create_oval(
@@ -179,13 +195,14 @@ class MonitorApp:
         hx = sx + ICON_R * math.sin(rad)
         hy = sy - ICON_R * math.cos(rad)
         self.canvas.create_line(sx, sy, hx, hy, fill=COLOR_TEXT, width=2, tags="drone")
-        # ラベル（識別子＋バッテリ）
+        # ラベル（識別子＋バッテリ）。バッテリ 20% 以下は赤太字で警告（検収 A4 と同閾値）
+        low_batt = is_low_battery(beacon.battery)
         self.canvas.create_text(
             sx,
             sy - ICON_R - 10,
             text=f"{beacon.id}  {beacon.battery}%",
-            font=("sans-serif", 10),
-            fill=COLOR_TEXT,
+            font=("sans-serif", 10, "bold") if low_batt else ("sans-serif", 10),
+            fill=COLOR_LOST if low_batt else COLOR_TEXT,
             tags="drone",
         )
 

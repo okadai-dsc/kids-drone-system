@@ -7,9 +7,11 @@ from operator_pc.drone_monitor.status import (
     GONE,
     LOST,
     STALE,
-    is_outside_cage,
+    is_cage_warning,
+    is_low_battery,
     staleness_level,
 )
+from shared.schemas import HOME_POSITIONS
 
 
 def test_staleness_level_thresholds():
@@ -23,13 +25,29 @@ def test_staleness_level_thresholds():
     assert staleness_level(120.0) == GONE
 
 
-def test_is_outside_cage_inside():
-    assert is_outside_cage(0.0, 0.0, 0.0) is False
-    assert is_outside_cage(6.5, 3.5, 2.0) is False
-    assert is_outside_cage(3.25, 1.75, 1.0) is False
+def test_cage_warning_inside_safe_zone():
+    assert is_cage_warning(0.5, 0.5, 0.0) is False  # 警告ゾーン境界ちょうどは安全側
+    assert is_cage_warning(6.0, 3.0, 1.8) is False
+    assert is_cage_warning(3.25, 1.75, 1.0) is False  # ケージ中央
 
 
-def test_is_outside_cage_outside():
-    assert is_outside_cage(6.6, 1.0, 1.0) is True  # x 超過
-    assert is_outside_cage(1.0, -0.1, 1.0) is True  # y 下限割れ
-    assert is_outside_cage(1.0, 1.0, 2.1) is True  # 高度 2m 超
+def test_cage_warning_near_boundary():
+    assert is_cage_warning(0.4, 1.0, 1.0) is True  # x 左端に接近
+    assert is_cage_warning(6.1, 1.0, 1.0) is True  # x 右端に接近
+    assert is_cage_warning(1.0, 0.4, 1.0) is True  # y 手前（観客席側）に接近
+    assert is_cage_warning(1.0, 3.1, 1.0) is True  # y 奥に接近
+    assert is_cage_warning(1.0, 1.0, 1.9) is True  # 高度上限に接近
+    assert is_cage_warning(7.0, 1.0, 1.0) is True  # ケージ外も警告
+
+
+def test_low_battery_threshold():
+    assert is_low_battery(100) is False
+    assert is_low_battery(21) is False
+    assert is_low_battery(20) is True  # 20% ちょうども警告（検収 A4 と同じ <= 判定）
+    assert is_low_battery(0) is True
+
+
+def test_home_positions_within_safe_zone():
+    """ホームポジション（配置図）が警告ゾーン内にあること（閾値との整合性ガード）。"""
+    for x, y in HOME_POSITIONS.values():
+        assert is_cage_warning(x, y, 0.0) is False
