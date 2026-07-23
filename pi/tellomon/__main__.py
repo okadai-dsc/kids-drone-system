@@ -15,6 +15,7 @@ from tkinter import END, NW, VERTICAL, E, IntVar, N, StringVar
 import cv2
 
 from shared.ports import NOTE_PC_IP, PI_TO_YOLO_VIDEO_PORTS
+from shared.schemas import HOME_POSITIONS, HOME_YAW
 
 from . import cage, commands, safety
 from .beacon import BeaconSender
@@ -127,7 +128,9 @@ VIDEO_FLAG = 0
 # 想定位置（メートル系。表示用キャンバスのレガシー座標とは別管理）を積算し、
 # ケージ外/高度2m超になる移動コマンドを Tello に送らず抑止する。
 CAGE_GUARD = True  # False で抑止を無効化（デバッグ/キャリブレーション用）
-# 離陸時の想定位置(m)。既定はケージ中央。実機では離陸位置に合わせて調整する。
+# 離陸時の想定位置(m)と機首方向。main() で機体番号に応じたホームポジション
+# （shared/schemas.py の HOME_POSITIONS。--init-x/--init-y/--init-yaw で上書き可）に
+# 再設定される。ここはフォールバック値（ケージ中央）。
 INIT_X = (cage.CAGE_X[0] + cage.CAGE_X[1]) / 2  # 3.25
 INIT_Y = (cage.CAGE_Y[0] + cage.CAGE_Y[1]) / 2  # 1.75
 INIT_YAW = 0
@@ -1022,8 +1025,35 @@ def main():
         default=NOTE_PC_IP,
         help=f"ビーコン送信先ホスト（既定: {NOTE_PC_IP}。ローカル確認は 127.0.0.1）",
     )
+    parser.add_argument(
+        "--init-x",
+        type=float,
+        default=None,
+        help="離陸位置 x(m)。既定: 機体番号のホームポジション",
+    )
+    parser.add_argument(
+        "--init-y",
+        type=float,
+        default=None,
+        help="離陸位置 y(m)。既定: 機体番号のホームポジション",
+    )
+    parser.add_argument(
+        "--init-yaw",
+        type=int,
+        default=None,
+        help=f"離陸時の機首方向(度, 0=+Y=奥向き)。既定: {HOME_YAW}",
+    )
     args = parser.parse_args()
     drone_num = args.drone
+
+    # 離陸時の想定位置を機体番号のホームポジション（会場配置図）に合わせる。
+    # DRONE_STATE は takeoff のたびに INIT_* からリセットされるため、両方更新する。
+    global INIT_X, INIT_Y, INIT_YAW, DRONE_STATE
+    home_x, home_y = HOME_POSITIONS[drone_num]
+    INIT_X = home_x if args.init_x is None else args.init_x
+    INIT_Y = home_y if args.init_y is None else args.init_y
+    INIT_YAW = (HOME_YAW if args.init_yaw is None else args.init_yaw) % 360
+    DRONE_STATE = cage.DroneState(x=INIT_X, y=INIT_Y, z=0.0, yaw=INIT_YAW)
 
     # コマンド送信用ソケットの作成
     #    com = ComHandler()
