@@ -8,9 +8,10 @@ from __future__ import annotations
 import socket
 import threading
 import time
+from dataclasses import replace
 
 from shared.ports import BEACON_PORT
-from shared.schemas import Beacon
+from shared.schemas import HOME_POSITIONS, Beacon
 
 
 class BeaconStore:
@@ -24,10 +25,36 @@ class BeaconStore:
         self._lock = threading.Lock()
         self._latest: dict[str, Beacon] = {}
         self._recv_time: dict[str, float] = {}  # id -> 受信時刻(monotonic 秒)
+        self._home_offsets: dict[str, tuple[float, float]] = {}
+
+    def _align_to_home(self, beacon: Beacon) -> Beacon:
+        """初回ビーコン位置をホーム位置に合わせ、以後の相対移動は保つ。"""
+        if beacon.id in self._home_offsets:
+            dx, dy = self._home_offsets[beacon.id]
+            return replace(beacon, x=round(beacon.x + dx, 2), y=round(beacon.y + dy, 2))
+
+        prefix = "Tello#"
+        if not beacon.id.startswith(prefix):
+            return beacon
+
+        try:
+            drone_num = int(beacon.id[len(prefix) :])
+        except ValueError:
+            return beacon
+
+        home = HOME_POSITIONS.get(drone_num)
+        if home is None:
+            return beacon
+
+        dx = home[0] - beacon.x
+        dy = home[1] - beacon.y
+        self._home_offsets[beacon.id] = (dx, dy)
+        return replace(beacon, x=round(home[0], 2), y=round(home[1], 2))
 
     def update(self, beacon: Beacon, recv_time: float | None = None) -> None:
         if recv_time is None:
             recv_time = time.monotonic()
+        beacon = self._align_to_home(beacon)
         with self._lock:
             self._latest[beacon.id] = beacon
             self._recv_time[beacon.id] = recv_time
