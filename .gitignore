@@ -21,13 +21,14 @@ node_modules/
 tello/.tellomon.py.sw*
 tello/tellomon.py.[0-9]*
 
-# docs は development.md 以外すべて git 管理外（履歴からも削除済み）
+# docs は PDF・設計書・計画書など重量物を除外し、セットアップ/開発系の .md だけ追跡する
 # 設計書・計画書・PDF・図は手元 or 外部（Drive 等）で管理する
 docs/*
 !docs/development.md
 !docs/demo.md
 !docs/network-setup.md
 !docs/raspi-setup.md
+!docs/yolopc-setup.md
 !docs/.gitkeep
 *.pt
 .claude/settings.local.json
