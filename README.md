@@ -64,18 +64,52 @@ flowchart LR
 
 経験者 1名 + 初心者 1名の2名チーム。担当分けは開発計画（リポジトリ管理外）参照。
 
-## 起動例
+## 起動方法
 
-YOLO 結果表示:
+初回セットアップは [Raspberry Pi](docs/raspi-setup.md) / [YOLO PC](docs/yolopc-setup.md) を参照。ここでは毎回の起動コマンドだけをまとめる。動かす号機ぶんだけ番号（`--drone N` / IP 末尾 `.1N`）を変えて繰り返す。
+
+### Raspberry Pi（号機ごと）
+
+`N` は号機番号（1〜4）。eth0 の固定IPは号機に対応（#1→`.11` / #2→`.12` / #3→`.13` / #4→`.14`）。
 
 ```bash
-uv sync
-uv run python yolo_display.py
+# ① eth0 が号機の固定IP（例: 号機2 → 192.168.0.12）か確認
+ip addr show eth0        # "inet 192.168.0.12/24" が出ていれば OK
+
+# ①-a 出ていなければ dhcpcd.conf に追記して固定（初回のみ。.12 は号機に合わせる）
+#   interface eth0
+#   static ip_address=192.168.0.12/24
+sudo nano /etc/dhcpcd.conf
+sudo systemctl restart dhcpcd
+
+# ② Tello の電源を入れ、Pi の Wi-Fi を担当機の AP（TELLO-XXXXXX）に接続
+
+# ③ tellomon（リポジトリのルートから。--drone は号機番号）
+cd ~/kids-drone-system
+python3 -m pi.tellomon --drone 2
+
+# ④ Scratch GUI 配信（別ターミナルで）
+cd ~/kids-drone-system/build && python3 -m http.server 8601
 ```
 
-`fake_detection.json` の読み込み、または UDP `11212〜11215` の `YoloResult` 受信で
-Tello#1〜#4 の bbox 画像が 4 区画に表示されます。
-検知時は各画像区画の小さな状態ラベルと枠が 3 秒間緑に変わります。
+ブラウザで `http://localhost:8601/` を開き、Scratch で「つなぐ」→「streamon」。
+
+### YOLO PC（中央ノートPC / Windows ネイティブ）
+
+リポジトリのルートで、ターミナルを分けて起動する。
+
+```powershell
+cd kids-drone-system
+
+# YOLO 推論 ×4（号機ごとに1プロセス）
+uv run python yolo/yolo_proc.py --drone 1 --rate 5
+uv run python yolo/yolo_proc.py --drone 2 --rate 5
+uv run python yolo/yolo_proc.py --drone 3 --rate 5
+uv run python yolo/yolo_proc.py --drone 4 --rate 5
+
+# 統合モニタ（検知タイル＋飛行マップ＋全機緊急停止 を1画面）
+uv run python -m operator_pc.integrated_ui
+```
 
 ## 進め方
 
