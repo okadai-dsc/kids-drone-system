@@ -4,19 +4,33 @@ version = "0.1.0"
 description = "おもしろ体験でぇ～ 出展システム"
 readme = "README.md"
 requires-python = ">=3.12"
+dependencies = [
+    # pi/tellomon が映像処理に使用（`uv run python -m pi.tellomon` をルート env で起動するため）
+    "opencv-python>=4.13.0.92",
+    "pillow>=12.0.0",
+]
 
 # 各サブパッケージ（pi/tellomon, yolo_pc/yolo_proc, operator_pc/*, shared）は
 # 着手時に member として追加していく。tello/ は移植前なので一時的にここに入れている。
 [tool.uv.workspace]
 members = [
     "tello",
+    "yolo",
 ]
 
 [dependency-groups]
 dev = [
     "ruff>=0.8.0",
     "pre-commit>=4.0",
+    "pytest>=8.0",
 ]
+
+# ---------------------------------------------------------------------------
+# pytest: ユニットテスト（純粋ロジックを tests/ で検証。GUI/実機依存は対象外）
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]  # repo ルートを import パスに（shared / pi / operator_pc / yolo）
 
 # ---------------------------------------------------------------------------
 # Ruff: lint + format（保存時自動整形を推奨）

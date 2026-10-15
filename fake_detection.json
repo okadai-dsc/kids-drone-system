@@ -1,0 +1,12 @@
+{
+  "tello_id": "Tello#1",
+  "ts": "2026-06-18T12:00:00.000",
+  "detections": [
+    {
+      "label": "cat",
+      "confidence": 0.99,
+      "bbox": [10, 10, 100, 100]
+    }
+  ],
+  "image_b64": ""
+}
