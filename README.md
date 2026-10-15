@@ -93,20 +93,6 @@ uv run python yolo/yolo_proc.py --drone 4 --rate 5
 uv run python -m operator_pc.integrated_ui
 ```
 
-## 進め方
-
-GitHub の **Milestone (M1〜M4)** と **Issue (C1〜C7)** で管理。
-
-| Milestone | 期日 | 内容 |
-|---|---|---|
-| M1: 個別コンポーネント骨組み完了 | 2026-06-12 | 各コンポーネントがダミー入出力で単体起動 |
-| M2: 1台 E2E 実飛行デモ（中間レビュー）| 2026-06-19 | Scratch → 実飛行 → YOLO 検知 → 中央UI 表示 |
-| M3: 2台同時 E2E | 2026-06-26 | 手元 Tello 2台で同時通り抜け |
-| M4: 月末まとめ | 2026-06-30 | 残課題整理、7月評価準備 |
-
-ラベル：`area:tellomon` / `area:yolo_proc` / `area:drone_monitor` / `area:yolo_display` / `area:scratch` / `area:shared`、`role:A` / `role:B`
-
-
 ## ライセンス
 
 [MIT](LICENSE)
