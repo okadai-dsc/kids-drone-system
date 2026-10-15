@@ -45,24 +45,6 @@ flowchart LR
 
 > `Scratch/` は LLK 公式リポジトリの clone のため `.gitignore` で除外しています。drone 拡張の改造は消失リスク回避のため **`okadai-dsc` に fork 済み**（`okadai-dsc/scratch-vm`・`okadai-dsc/scratch-gui` の `drone` ブランチ）。セットアップ手順は [docs/development.md](docs/development.md) を参照。submodule 化は必要が出たら別 issue で対応します。
 
-## ドキュメント
-
-設計書（正本）・計画書・仕様詳細ドラフト・PDF・図は **リポジトリ管理外**（手元 / Drive 等で管理）。ポート・IP の正本はコード側の [shared/ports.py](shared/ports.py)。
-
-やりたいことから読む文書を選ぶ：
-
-| やりたいこと | 読むもの |
-|---|---|
-| 開発に参加する（uv 環境・ブランチ運用・Scratch ビルド）| [docs/development.md](docs/development.md) |
-| Raspberry Pi を1台構築する（Buster 標準ルート）| [docs/raspi-setup.md](docs/raspi-setup.md) |
-| 中央ノートPC（YOLO PC）を構築する | [docs/yolopc-setup.md](docs/yolopc-setup.md) |
-| ネットワークの考え方・疎通確認を知る | [docs/network-setup.md](docs/network-setup.md) |
-| 1台 E2E デモを再現する（リハ構成）| [docs/demo.md](docs/demo.md) |
-| 過去の検証記録・ハマりどころを知る | [docs/e2e-1drone.md](docs/e2e-1drone.md) |
-
-## 体制
-
-経験者 1名 + 初心者 1名の2名チーム。担当分けは開発計画（リポジトリ管理外）参照。
 
 ## 起動方法
 
@@ -124,9 +106,6 @@ GitHub の **Milestone (M1〜M4)** と **Issue (C1〜C7)** で管理。
 
 ラベル：`area:tellomon` / `area:yolo_proc` / `area:drone_monitor` / `area:yolo_display` / `area:scratch` / `area:shared`、`role:A` / `role:B`
 
-## 開発フロー
-
-セットアップ手順・ブランチ運用・コーディングスタイルは [docs/development.md](docs/development.md) を参照してください。
 
 ## ライセンス
 
